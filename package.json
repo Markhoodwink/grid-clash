@@ -3,7 +3,7 @@
     "version": "1.0.0",
     "private": true,
     "scripts": {
-        "build": "npm run build --prefix client && npm install --prefix server",
-        "start": "npm run start --prefix server"
+        "build": "cd client && npm install && npm run build && cd ../server && npm install",
+        "start": "cd server && npx tsx src/index.ts"
     }
 }
