@@ -8,7 +8,7 @@ export interface Player {
 
 export interface Shape {
     id: string;
-    matrix: number[][]; // e.g. [[1,1], [0,1]]
+    matrix: number[][];
     color: string;
 }
 
@@ -17,6 +17,7 @@ export interface LevelData {
     gridHeight: number;
     targetCellsCount: number;
     pieces: Shape[];
+    solutionGrid?: string[][];
 }
 
 export interface Room {

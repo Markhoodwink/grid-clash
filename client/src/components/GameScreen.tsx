@@ -27,7 +27,7 @@ interface PaintSplat {
     y: number;
     size: number;
     color: string;
-    hp: number; // от 100 до 0
+    hp: number;
 }
 
 type ChaosEvent = 'NONE' | 'PAINT' | 'FLIP' | 'MONOCHROME' | 'EARTHQUAKE';
@@ -38,6 +38,7 @@ interface GameScreenProps {
         gridHeight: number;
         targetCellsCount: number;
         pieces: Shape[];
+        solutionGrid?: string[][];
     };
     roomCode: string;
     players?: Record<string, Player>;
@@ -46,7 +47,7 @@ interface GameScreenProps {
 
 const EVENT_INFO: Record<ChaosEvent, { title: string; color: string }> = {
     NONE: { title: '⏳ Спокойствие перед бурей...', color: '#38bdf8' },
-    PAINT: { title: '🎨 КРАСКА! Активно три кляксы пальцем!', color: '#ec4899' },
+    PAINT: { title: '🎨 КРАСКА! Быстро три кляксы пальцем!', color: '#ec4899' },
     FLIP: { title: '🙃 ПЕРЕВОРОТ! Поле вверх ногами!', color: '#f59e0b' },
     MONOCHROME: { title: '🎭 ХАМЕЛЕОН! Все фигуры одного цвета!', color: '#a855f7' },
     EARTHQUAKE: { title: '🌋 ЗЕМЛЕТРЯСЕНИЕ! Держи экран!', color: '#ef4444' }
@@ -55,7 +56,6 @@ const EVENT_INFO: Record<ChaosEvent, { title: string; color: string }> = {
 const SPLAT_COLORS = ['#ec4899', '#8b5cf6', '#10b981', '#f59e0b', '#06b6d4', '#ef4444'];
 const MONO_COLOR = '#8b5cf6';
 
-// --- ВСТРОЕННЫЙ СИНТЕЗАТОР ЗВУКОВ (WEB AUDIO API) ---
 class SoundFX {
     private ctx: AudioContext | null = null;
     public muted: boolean = false;
@@ -64,7 +64,7 @@ class SoundFX {
     private getContext(): AudioContext | null {
         if (this.muted) return null;
         if (!this.ctx) {
-            const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+            const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
             if (AudioCtx) this.ctx = new AudioCtx();
         }
         if (this.ctx && this.ctx.state === 'suspended') {
@@ -73,70 +73,57 @@ class SoundFX {
         return this.ctx;
     }
 
-    // Звук установки фигуры в клетки поля
     playSnap() {
         const ctx = this.getContext();
         if (!ctx) return;
         const now = ctx.currentTime;
-
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.type = 'triangle';
         osc.frequency.setValueAtTime(190, now);
         osc.frequency.exponentialRampToValueAtTime(520, now + 0.085);
-
         gain.gain.setValueAtTime(0.28, now);
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
-
         osc.connect(gain);
         gain.connect(ctx.destination);
         osc.start(now);
         osc.stop(now + 0.09);
     }
 
-    // Звук возврата фигуры в лоток
     playReturn() {
         const ctx = this.getContext();
         if (!ctx) return;
         const now = ctx.currentTime;
-
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.type = 'sine';
         osc.frequency.setValueAtTime(240, now);
         osc.frequency.exponentialRampToValueAtTime(120, now + 0.08);
-
         gain.gain.setValueAtTime(0.15, now);
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
-
         osc.connect(gain);
         gain.connect(ctx.destination);
         osc.start(now);
         osc.stop(now + 0.08);
     }
 
-    // Звук поворота фигуры
     playRotate() {
         const ctx = this.getContext();
         if (!ctx) return;
         const now = ctx.currentTime;
-
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.type = 'sine';
         osc.frequency.setValueAtTime(320, now);
         osc.frequency.exponentialRampToValueAtTime(600, now + 0.06);
-
         gain.gain.setValueAtTime(0.18, now);
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.065);
-
         osc.connect(gain);
         gain.connect(ctx.destination);
         osc.start(now);
         osc.stop(now + 0.065);
     }
 
-    // Звук трения губки при стирании кляксы
     playWipeSqueak() {
         const nowMs = Date.now();
         if (nowMs - this.lastSqueakTime < 65) return;
@@ -145,94 +132,76 @@ class SoundFX {
         const ctx = this.getContext();
         if (!ctx) return;
         const now = ctx.currentTime;
-
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.type = 'triangle';
         const baseFreq = 650 + Math.random() * 250;
         osc.frequency.setValueAtTime(baseFreq, now);
         osc.frequency.exponentialRampToValueAtTime(baseFreq * 1.35, now + 0.045);
-
         gain.gain.setValueAtTime(0.09, now);
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
-
         osc.connect(gain);
         gain.connect(ctx.destination);
         osc.start(now);
         osc.stop(now + 0.05);
     }
 
-    // Звуки для каждого из 4 ивентов
     playEvent(event: ChaosEvent) {
         const ctx = this.getContext();
         if (!ctx) return;
         const now = ctx.currentTime;
 
         if (event === 'PAINT') {
-            // Всплеск краски (серия пузырьков)
             [380, 260, 490, 310].forEach((freq, i) => {
                 const osc = ctx.createOscillator();
                 const gain = ctx.createGain();
                 osc.type = 'sine';
                 osc.frequency.setValueAtTime(freq, now + i * 0.055);
                 osc.frequency.exponentialRampToValueAtTime(freq * 1.7, now + i * 0.055 + 0.06);
-
                 gain.gain.setValueAtTime(0.22, now + i * 0.055);
                 gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.055 + 0.07);
-
                 osc.connect(gain);
                 gain.connect(ctx.destination);
                 osc.start(now + i * 0.055);
                 osc.stop(now + i * 0.055 + 0.07);
             });
         } else if (event === 'FLIP') {
-            // Гравитационный свист переворота
             const osc = ctx.createOscillator();
             const gain = ctx.createGain();
             osc.type = 'triangle';
             osc.frequency.setValueAtTime(200, now);
             osc.frequency.exponentialRampToValueAtTime(680, now + 0.18);
             osc.frequency.exponentialRampToValueAtTime(240, now + 0.35);
-
             gain.gain.setValueAtTime(0.25, now);
             gain.gain.exponentialRampToValueAtTime(0.001, now + 0.36);
-
             osc.connect(gain);
             gain.connect(ctx.destination);
             osc.start(now);
             osc.stop(now + 0.36);
         } else if (event === 'MONOCHROME') {
-            // Мистический аккорд хамелеона
             [440, 554.37, 659.25].forEach((freq, i) => {
                 const osc = ctx.createOscillator();
                 const gain = ctx.createGain();
                 osc.type = 'sine';
                 osc.frequency.setValueAtTime(freq, now + i * 0.06);
-
                 gain.gain.setValueAtTime(0.16, now + i * 0.06);
                 gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.06 + 0.32);
-
                 osc.connect(gain);
                 gain.connect(ctx.destination);
                 osc.start(now + i * 0.06);
                 osc.stop(now + i * 0.06 + 0.32);
             });
         } else if (event === 'EARTHQUAKE') {
-            // Подземный низкочастотный гул
             const osc = ctx.createOscillator();
             const filter = ctx.createBiquadFilter();
             const gain = ctx.createGain();
-
             osc.type = 'sawtooth';
             osc.frequency.setValueAtTime(75, now);
             osc.frequency.linearRampToValueAtTime(42, now + 0.48);
-
             filter.type = 'lowpass';
             filter.frequency.setValueAtTime(150, now);
-
             gain.gain.setValueAtTime(0.32, now);
             gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
-
             osc.connect(filter);
             filter.connect(gain);
             gain.connect(ctx.destination);
@@ -241,25 +210,21 @@ class SoundFX {
         }
     }
 
-    // Звук победы или окончания раунда
     playRoundEnd(isWinner: boolean) {
         const ctx = this.getContext();
         if (!ctx) return;
         const now = ctx.currentTime;
-
         const notes = isWinner
-            ? [523.25, 659.25, 783.99, 1046.5] // Победная фанфара (До-Ми-Соль-До)
-            : [392.0, 349.23, 311.13, 261.63]; // Сигнал поражения
+            ? [523.25, 659.25, 783.99, 1046.5]
+            : [392.0, 349.23, 311.13, 261.63];
 
         notes.forEach((freq, idx) => {
             const osc = ctx.createOscillator();
             const gain = ctx.createGain();
             osc.type = 'triangle';
             osc.frequency.setValueAtTime(freq, now + idx * 0.09);
-
             gain.gain.setValueAtTime(0.25, now + idx * 0.09);
             gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.09 + 0.32);
-
             osc.connect(gain);
             gain.connect(ctx.destination);
             osc.start(now + idx * 0.09);
@@ -284,6 +249,9 @@ export const GameScreen: React.FC<GameScreenProps> = ({
     const PREVIEW_CELL = maxDimension >= 7 ? 13 : 16;
     const PREVIEW_GAP = 2;
 
+    // Размер клеток решения в модальном окне
+    const SOL_CELL_SIZE = maxDimension >= 8 ? 18 : maxDimension >= 6 ? 22 : maxDimension === 5 ? 26 : 30;
+
     const [pieces, setPieces] = useState<PlacedShape[]>(
         level.pieces.map((p) => ({ ...p, row: null, col: null }))
     );
@@ -300,7 +268,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({
     const [roundWinner, setRoundWinner] = useState<{ id: string; name: string } | null>(null);
     const [roundResults, setRoundResults] = useState<Player[] | null>(null);
 
-    // Состояния хаос-ивентов и звука
     const [activeEvent, setActiveEvent] = useState<ChaosEvent>('NONE');
     const [eventCountdown, setEventCountdown] = useState<number>(10);
     const [paintSplats, setPaintSplats] = useState<PaintSplat[]>([]);
@@ -311,7 +278,14 @@ export const GameScreen: React.FC<GameScreenProps> = ({
     const boardRef = useRef<HTMLDivElement | null>(null);
     const draggedPiece = pieces.find((p) => p.id === draggedId) || null;
 
-    // Подписка на события сокетов
+    // Рефы для стабильного глобального перетаскивания без рассинхрона
+    const snapTargetRef = useRef<any>(null);
+    const draggedPieceRef = useRef<PlacedShape | null>(null);
+    const piecesRef = useRef<PlacedShape[]>(pieces);
+
+    draggedPieceRef.current = draggedPiece;
+    piecesRef.current = pieces;
+
     useEffect(() => {
         socket.on('player_progress_changed', ({ playerId, progress }: { playerId: string; progress: number }) => {
             setOpponents((prev) =>
@@ -332,7 +306,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({
         };
     }, [myId]);
 
-    // Генерация густых клякс краски
     const spawnPaintSplats = () => {
         const count = 5;
         const w = window.innerWidth;
@@ -341,14 +314,13 @@ export const GameScreen: React.FC<GameScreenProps> = ({
             id: Date.now() + i,
             x: w * 0.18 + Math.random() * (w * 0.64),
             y: h * 0.22 + Math.random() * (h * 0.45),
-            size: 120 + Math.floor(Math.random() * 45),
+            size: 115 + Math.floor(Math.random() * 40),
             color: SPLAT_COLORS[i % SPLAT_COLORS.length],
             hp: 100
         }));
         setPaintSplats(newSplats);
     };
 
-    // Таймер смены случайного ивента каждые 10 секунд
     useEffect(() => {
         if (roundResults) return;
 
@@ -369,7 +341,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                         setPaintSplats([]);
                     }
 
-                    if (nextEvent === 'EARTHQUAKE' && navigator.vibrate) {
+                    if (nextEvent === 'EARTHQUAKE' && 'vibrate' in navigator) {
                         navigator.vibrate([100, 50, 150, 50, 200]);
                     }
 
@@ -383,7 +355,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({
         return () => clearInterval(timer);
     }, [roundResults]);
 
-    // Усложненное оттирание клякс: требует реального движения пальцем туда-сюда
     const wipePaintAt = (clientX: number, clientY: number) => {
         if (paintSplats.length === 0) return;
 
@@ -392,10 +363,8 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 
         if (!last) return;
         const moveStep = Math.hypot(clientX - last.x, clientY - last.y);
-        // Если палец стоит на месте — краска не стирается
         if (moveStep < 3) return;
 
-        // Урон кляксе за один шаг движения ограничен (нужно интенсивно тереть)
         const scrubDamage = Math.min(6.5, moveStep * 0.25);
         let hitAny = false;
 
@@ -443,9 +412,9 @@ export const GameScreen: React.FC<GameScreenProps> = ({
         );
     };
 
+    // Старт перетаскивания: одинаково легко берется и вертикальная, и горизонтальная фигура
     const handleStartDrag = (piece: PlacedShape, e: React.PointerEvent) => {
         if (roundResults || paintSplats.length > 0) return;
-        (e.target as HTMLElement).setPointerCapture(e.pointerId);
 
         const shapeRows = piece.matrix.length;
         const shapeCols = piece.matrix[0].length;
@@ -456,15 +425,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({
         });
 
         setDraggedId(piece.id);
-        setDragPos({ x: e.clientX, y: e.clientY });
-    };
-
-    const handlePointerMove = (e: React.PointerEvent) => {
-        if (paintSplats.length > 0) {
-            wipePaintAt(e.clientX, e.clientY);
-        }
-
-        if (!draggedId || roundResults) return;
         setDragPos({ x: e.clientX, y: e.clientY });
     };
 
@@ -525,37 +485,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
     };
 
     const snapTarget = getSnapTarget();
-
-    const handlePointerUp = () => {
-        lastWipePosRef.current = null;
-
-        if (!draggedPiece || roundResults) {
-            setDraggedId(null);
-            setDragPos(null);
-            return;
-        }
-
-        if (snapTarget && snapTarget.isValid) {
-            sfx.playSnap();
-            if (navigator.vibrate) navigator.vibrate(25);
-
-            const updated = pieces.map((p) =>
-                p.id === draggedPiece.id ? { ...p, row: snapTarget.row, col: snapTarget.col } : p
-            );
-            setPieces(updated);
-            updateTotalProgress(updated);
-        } else {
-            sfx.playReturn();
-            const updated = pieces.map((p) =>
-                p.id === draggedPiece.id ? { ...p, row: null, col: null } : p
-            );
-            setPieces(updated);
-            updateTotalProgress(updated);
-        }
-
-        setDraggedId(null);
-        setDragPos(null);
-    };
+    snapTargetRef.current = snapTarget;
 
     const updateTotalProgress = (currentPieces: PlacedShape[]) => {
         let filled = 0;
@@ -577,13 +507,66 @@ export const GameScreen: React.FC<GameScreenProps> = ({
         }
     };
 
+    // Глобальное отслеживание пальца через window (фигура больше никогда не теряется)
+    useEffect(() => {
+        if (!draggedId) return;
+
+        const handleWindowPointerMove = (e: PointerEvent) => {
+            setDragPos({ x: e.clientX, y: e.clientY });
+        };
+
+        const handleWindowPointerUp = () => {
+            lastWipePosRef.current = null;
+            const piece = draggedPieceRef.current;
+            const snap = snapTargetRef.current;
+            const currentPieces = piecesRef.current;
+
+            if (!piece) {
+                setDraggedId(null);
+                setDragPos(null);
+                return;
+            }
+
+            if (snap && snap.isValid) {
+                sfx.playSnap();
+                if ('vibrate' in navigator) navigator.vibrate(25);
+
+                const updated = currentPieces.map((p) =>
+                    p.id === piece.id ? { ...p, row: snap.row, col: snap.col } : p
+                );
+                setPieces(updated);
+                updateTotalProgress(updated);
+            } else {
+                sfx.playReturn();
+                const updated = currentPieces.map((p) =>
+                    p.id === piece.id ? { ...p, row: null, col: null } : p
+                );
+                setPieces(updated);
+                updateTotalProgress(updated);
+            }
+
+            setDraggedId(null);
+            setDragPos(null);
+        };
+
+        window.addEventListener('pointermove', handleWindowPointerMove);
+        window.addEventListener('pointerup', handleWindowPointerUp);
+        window.addEventListener('pointercancel', handleWindowPointerUp);
+
+        return () => {
+            window.removeEventListener('pointermove', handleWindowPointerMove);
+            window.removeEventListener('pointerup', handleWindowPointerUp);
+            window.removeEventListener('pointercancel', handleWindowPointerUp);
+        };
+    }, [draggedId]);
+
     const getDisplayColor = (originalColor: string) => {
         return activeEvent === 'MONOCHROME' ? MONO_COLOR : originalColor;
     };
 
     const boardCells: { color: string | null; shape: PlacedShape | null }[][] = Array.from(
         { length: level.gridHeight },
-        () => Array(level.gridWidth).fill({ color: null, shape: null })
+        () => Array.from({ length: level.gridWidth }, () => ({ color: null, shape: null }))
     );
 
     pieces.forEach((p) => {
@@ -601,12 +584,13 @@ export const GameScreen: React.FC<GameScreenProps> = ({
         }
     });
 
-    const trayPieces = pieces.filter((p) => p.row === null && p.id !== draggedId);
+    const trayPieces = pieces.filter((p) => p.row === null);
 
     return (
         <div
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
+            onPointerMove={(e) => {
+                if (paintSplats.length > 0) wipePaintAt(e.clientX, e.clientY);
+            }}
             style={{
                 paddingTop: 8,
                 paddingLeft: 12,
@@ -619,6 +603,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                 maxHeight: '100dvh',
                 justifyContent: 'space-between',
                 userSelect: 'none',
+                WebkitUserSelect: 'none',
                 touchAction: 'none',
                 boxSizing: 'border-box',
                 overflow: 'hidden'
@@ -635,7 +620,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
         }
       `}</style>
 
-            {/* 1. Верхняя панель: выход, звук, таймер ивентов и соперники */}
+            {/* 1. Верхняя панель: выход, звук, хаос-таймер и соперники */}
             <div style={{ width: '100%', maxWidth: 440, flex: '0 0 auto' }}>
                 <div
                     style={{
@@ -686,7 +671,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                     </div>
                 </div>
 
-                {/* Баннер случайного события каждые 10 секунд */}
+                {/* Индикатор текущего хаос-ивента */}
                 <div
                     style={{
                         background: '#1e293b',
@@ -826,7 +811,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                 )}
             </div>
 
-            {/* 3. Лоток фигур */}
+            {/* 3. Лоток фигур: гарантированно удобный захват горизонтальных фигур */}
             <div
                 style={{
                     width: '100%',
@@ -857,58 +842,81 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 
                 {trayPieces.map((piece) => {
                     const pieceColor = getDisplayColor(piece.color);
+                    const isBeingDragged = piece.id === draggedId;
+
                     return (
                         <div
                             key={piece.id}
-                            onPointerDown={(e) => handleStartDrag(piece, e)}
                             style={{
-                                padding: '6px 8px',
-                                borderRadius: 10,
+                                borderRadius: 12,
                                 background: '#1e293b',
+                                border: '1px solid #334155',
                                 display: 'flex',
                                 flexDirection: 'column',
                                 alignItems: 'center',
-                                cursor: 'grab',
-                                touchAction: 'none',
-                                border: '1px solid #334155'
+                                padding: '4px',
+                                opacity: isBeingDragged ? 0.3 : 1,
+                                pointerEvents: isBeingDragged ? 'none' : 'auto',
+                                touchAction: 'none'
                             }}
                         >
+                            {/* Просторная сенсорная зона (min-height 54px — берется мгновенно) */}
                             <div
+                                onPointerDown={(e) => handleStartDrag(piece, e)}
                                 style={{
-                                    display: 'grid',
-                                    gridTemplateColumns: `repeat(${piece.matrix[0].length}, ${PREVIEW_CELL}px)`,
-                                    gridTemplateRows: `repeat(${piece.matrix.length}, ${PREVIEW_CELL}px)`,
-                                    gap: `${PREVIEW_GAP}px`,
-                                    marginBottom: 5,
-                                    transform: activeEvent === 'FLIP' ? 'rotate(180deg)' : 'none',
-                                    transition: 'transform 0.3s ease'
+                                    minHeight: 54,
+                                    minWidth: 58,
+                                    padding: '6px 8px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    cursor: 'grab',
+                                    touchAction: 'none'
                                 }}
                             >
-                                {piece.matrix.map((row, r) =>
-                                    row.map((val, c) => (
-                                        <div
-                                            key={`${r}-${c}`}
-                                            style={{
-                                                width: PREVIEW_CELL,
-                                                height: PREVIEW_CELL,
-                                                borderRadius: 3,
-                                                background: val ? pieceColor : 'transparent'
-                                            }}
-                                        />
-                                    ))
-                                )}
+                                <div
+                                    style={{
+                                        display: 'grid',
+                                        gridTemplateColumns: `repeat(${piece.matrix[0].length}, ${PREVIEW_CELL}px)`,
+                                        gridTemplateRows: `repeat(${piece.matrix.length}, ${PREVIEW_CELL}px)`,
+                                        gap: `${PREVIEW_GAP}px`,
+                                        transform: activeEvent === 'FLIP' ? 'rotate(180deg)' : 'none',
+                                        transition: 'transform 0.3s ease',
+                                        pointerEvents: 'none'
+                                    }}
+                                >
+                                    {piece.matrix.map((row, r) =>
+                                        row.map((val, c) => (
+                                            <div
+                                                key={`${r}-${c}`}
+                                                style={{
+                                                    width: PREVIEW_CELL,
+                                                    height: PREVIEW_CELL,
+                                                    borderRadius: 3,
+                                                    background: val ? pieceColor : 'transparent'
+                                                }}
+                                            />
+                                        ))
+                                    )}
+                                </div>
                             </div>
+
+                            {/* Кнопка поворота вынесена отдельно */}
                             <button
+                                type="button"
                                 onPointerDown={(e) => e.stopPropagation()}
                                 onClick={(e) => handleRotate(piece.id, e)}
                                 style={{
                                     fontSize: 10,
+                                    fontWeight: 600,
                                     padding: '3px 8px',
                                     background: '#334155',
-                                    color: '#fff',
+                                    color: '#e2e8f0',
                                     border: 'none',
-                                    borderRadius: 5,
-                                    cursor: 'pointer'
+                                    borderRadius: 6,
+                                    cursor: 'pointer',
+                                    marginTop: 2,
+                                    marginBottom: 2
                                 }}
                             >
                                 ↻ Повернуть
@@ -918,7 +926,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                 })}
             </div>
 
-            {/* 4. Слой густых клякс краски (требуют интенсивного трения пальцем) */}
+            {/* 4. Кляксы краски */}
             {paintSplats.length > 0 && (
                 <div
                     onPointerDown={(e) => {
@@ -954,7 +962,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                             boxShadow: '0 4px 15px rgba(0,0,0,0.4)'
                         }}
                     >
-                        🧽 Интенсивно три кляксы пальцем ({paintSplats.length} шт.)!
+                        🧽 Три кляксы пальцем ({paintSplats.length} шт.)!
                     </div>
 
                     {paintSplats.map((splat) => (
@@ -1086,7 +1094,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                 </div>
             )}
 
-            {/* 7. Экран победы раунда */}
+            {/* 7. Экран победы раунда + РЕШЕНИЕ ПАЗЛА ДЛЯ ВСЕХ */}
             {roundResults && roundWinner && (
                 <div
                     style={{
@@ -1099,30 +1107,92 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                         alignItems: 'center',
                         justifyContent: 'center',
                         zIndex: 10001,
-                        padding: 20
+                        padding: 16,
+                        overflowY: 'auto'
                     }}
                 >
-                    <div style={{ width: '100%', maxWidth: 380, textAlign: 'center' }}>
-                        <div style={{ fontSize: 44, marginBottom: 6 }}>
+                    <div style={{ width: '100%', maxWidth: 380, textAlign: 'center', margin: 'auto' }}>
+                        <div style={{ fontSize: 38, marginBottom: 4 }}>
                             {roundWinner.id === myId ? '🏆' : '⚡'}
                         </div>
 
                         <h1
                             style={{
-                                fontSize: 26,
+                                fontSize: 24,
                                 fontWeight: 900,
                                 color: roundWinner.id === myId ? '#38bdf8' : '#f59e0b',
-                                marginBottom: 4
+                                marginBottom: 2
                             }}
                         >
                             {roundWinner.id === myId ? 'ВЫ ПОБЕДИЛИ!' : `${roundWinner.name} собрал быстрее всех!`}
                         </h1>
 
-                        <p style={{ color: '#94a3b8', fontSize: 13, marginBottom: 20 }}>
+                        <p style={{ color: '#94a3b8', fontSize: 12, marginBottom: 14 }}>
                             Счет серии (число побед)
                         </p>
 
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 24 }}>
+                        {/* Карточка правильного решения пазла */}
+                        {level.solutionGrid && (
+                            <div
+                                style={{
+                                    background: '#0b1329',
+                                    border: '1px solid #334155',
+                                    borderRadius: 12,
+                                    padding: '10px 14px',
+                                    marginBottom: 14,
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    boxShadow: '0 4px 16px rgba(0,0,0,0.3)'
+                                }}
+                            >
+                                <div
+                                    style={{
+                                        fontSize: 12,
+                                        fontWeight: 700,
+                                        color: '#94a3b8',
+                                        marginBottom: 8,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 6
+                                    }}
+                                >
+                                    <span>🧩</span> Как надо было собрать:
+                                </div>
+
+                                <div
+                                    style={{
+                                        display: 'grid',
+                                        gridTemplateColumns: `repeat(${level.gridWidth}, ${SOL_CELL_SIZE}px)`,
+                                        gridTemplateRows: `repeat(${level.gridHeight}, ${SOL_CELL_SIZE}px)`,
+                                        gap: '3px',
+                                        background: '#1e293b',
+                                        padding: 6,
+                                        borderRadius: 10,
+                                        border: '1px solid #334155'
+                                    }}
+                                >
+                                    {level.solutionGrid.map((row, r) =>
+                                        row.map((cellColor, c) => (
+                                            <div
+                                                key={`${r}-${c}`}
+                                                style={{
+                                                    width: SOL_CELL_SIZE,
+                                                    height: SOL_CELL_SIZE,
+                                                    borderRadius: 4,
+                                                    background: cellColor || '#0f172a',
+                                                    boxShadow: 'inset 0 0 4px rgba(0,0,0,0.4)',
+                                                    border: '1px solid rgba(255,255,255,0.06)'
+                                                }}
+                                            />
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Турнирная таблица серии */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
                             {roundResults.map((player, index) => {
                                 const medals = ['🥇', '🥈', '🥉'];
                                 const isRoundWinner = player.id === roundWinner.id;
@@ -1134,20 +1204,20 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                                             background: isRoundWinner ? 'rgba(56, 189, 248, 0.15)' : player.id === myId ? '#1e293b' : '#0f172a',
                                             border: isRoundWinner ? '2px solid #38bdf8' : '1px solid #334155',
                                             borderRadius: 10,
-                                            padding: '10px 14px',
+                                            padding: '8px 12px',
                                             display: 'flex',
                                             alignItems: 'center',
                                             justifyContent: 'space-between'
                                         }}
                                     >
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                            <span style={{ fontSize: 18 }}>{medals[index] || `#${index + 1}`}</span>
-                                            <span style={{ fontWeight: 600, fontSize: 15 }}>
+                                            <span style={{ fontSize: 16 }}>{medals[index] || `#${index + 1}`}</span>
+                                            <span style={{ fontWeight: 600, fontSize: 14 }}>
                                                 {player.name} {player.id === myId ? '(Вы)' : ''}
                                             </span>
                                         </div>
                                         <div>
-                                            <span style={{ fontWeight: 900, fontSize: 18, color: '#38bdf8' }}>
+                                            <span style={{ fontWeight: 900, fontSize: 16, color: '#38bdf8' }}>
                                                 {player.score || 0}
                                             </span>
                                             <span style={{ fontSize: 11, color: '#64748b', marginLeft: 4 }}>
@@ -1170,7 +1240,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                                         })
                                     }
                                     style={{
-                                        padding: 14,
+                                        padding: 12,
                                         borderRadius: 12,
                                         background: '#e11d48',
                                         color: '#fff',
@@ -1186,13 +1256,13 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                                 <button
                                     onClick={() => socket.emit('back_to_lobby', { code: roomCode })}
                                     style={{
-                                        padding: 12,
+                                        padding: 10,
                                         borderRadius: 12,
                                         background: '#1e293b',
                                         color: '#38bdf8',
                                         border: '1px solid #38bdf8',
                                         fontWeight: 'bold',
-                                        fontSize: 14,
+                                        fontSize: 13,
                                         cursor: 'pointer'
                                     }}
                                 >

@@ -6,12 +6,6 @@ const COLORS = [
     '#ec4899', '#14b8a6', '#d946ef', '#84cc16'
 ];
 
-// Тримино (3 клетки)
-const TROMINOES: number[][][] = [
-    [[1, 1, 1]],
-    [[1, 1], [1, 0]]
-];
-
 // Тетрамино (4 клетки)
 const TETROMINOES: number[][][] = [
     [[1, 1, 1, 1]],
@@ -39,36 +33,33 @@ const PENTAMINOES: number[][][] = [
     [[1, 1, 0, 0], [0, 1, 1, 1]]
 ];
 
+const TROMINOES: number[][][] = [
+    [[1, 1, 1]],
+    [[1, 1], [1, 0]]
+];
+
 function rotate(m: number[][]): number[][] {
     const rows = m.length;
     const cols = m[0].length;
     const res = Array.from({ length: cols }, () => Array(rows).fill(0));
     for (let r = 0; r < rows; r++) {
-        for (let c = 0; c < cols; c++) {
-            res[c][rows - 1 - r] = m[r][c];
-        }
+        for (let c = 0; c < cols; c++) res[c][rows - 1 - r] = m[r][c];
     }
     return res;
 }
 
-function flip(m: number[][]): number[][] {
-    return m.map((row) => [...row].reverse());
-}
-
+// Поворот только на 90/180/270 без зеркальных отражений
 function getAllOrientations(base: number[][]): number[][][] {
     const list: number[][][] = [];
     const signatures = new Set<string>();
     let curr = base;
-    for (let f = 0; f < 2; f++) {
-        for (let r = 0; r < 4; r++) {
-            const sig = JSON.stringify(curr);
-            if (!signatures.has(sig)) {
-                signatures.add(sig);
-                list.push(curr);
-            }
-            curr = rotate(curr);
+    for (let r = 0; r < 4; r++) {
+        const sig = JSON.stringify(curr);
+        if (!signatures.has(sig)) {
+            signatures.add(sig);
+            list.push(curr);
         }
-        curr = flip(base);
+        curr = rotate(curr);
     }
     return list;
 }
@@ -82,41 +73,13 @@ function shuffle<T>(arr: T[]): T[] {
     return res;
 }
 
-// Проверка, не осталось ли на поле изолированных пустых дырок по 1–2 клетки
-function hasInvalidPockets(board: number[][], h: number, w: number): boolean {
-    const visited = Array.from({ length: h }, () => Array(w).fill(false));
-    const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-
-    for (let r = 0; r < h; r++) {
-        for (let c = 0; c < w; c++) {
-            if (board[r][c] === 0 && !visited[r][c]) {
-                let count = 0;
-                const queue: [number, number][] = [[r, c]];
-                visited[r][c] = true;
-
-                while (queue.length > 0) {
-                    const [cr, cc] = queue.pop()!;
-                    count++;
-                    for (const [dr, dc] of dirs) {
-                        const nr = cr + dr;
-                        const nc = cc + dc;
-                        if (nr >= 0 && nr < h && nc >= 0 && nc < w && board[nr][nc] === 0 && !visited[nr][nc]) {
-                            visited[nr][nc] = true;
-                            queue.push([nr, nc]);
-                        }
-                    }
-                }
-
-                // Так как минимальная фигура состоит из 3 клеток, пустота из 1 или 2 клеток — тупик
-                if (count < 3) return true;
-            }
-        }
-    }
-    return false;
+interface PlacedResult {
+    matrix: number[][];
+    row: number;
+    col: number;
 }
 
-// Безотказный алгоритм прямой нарезки поля на связные полимино (фоллбэк со 100% гарантией)
-function carveBoardGuaranteed(w: number, h: number): { matrix: number[][] }[] {
+function carveBoardGuaranteed(w: number, h: number): PlacedResult[] {
     const grid = Array.from({ length: h }, () => Array(w).fill(-1));
     const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
     let regionId = 0;
@@ -125,7 +88,7 @@ function carveBoardGuaranteed(w: number, h: number): { matrix: number[][] }[] {
         for (let c = 0; c < w; c++) {
             if (grid[r][c] !== -1) continue;
 
-            const targetSize = 3 + Math.floor(Math.random() * 3); // 3, 4 или 5 клеток
+            const targetSize = 3 + Math.floor(Math.random() * 3);
             const cells: [number, number][] = [[r, c]];
             grid[r][c] = regionId;
 
@@ -145,12 +108,11 @@ function carveBoardGuaranteed(w: number, h: number): { matrix: number[][] }[] {
                 grid[nextR][nextC] = regionId;
                 cells.push([nextR, nextC]);
             }
-
             regionId++;
         }
     }
 
-    // Если остались мелкие кусочки из 1–2 клеток, присоединяем их к соседней фигуре
+    // Склеиваем мелкие остатки
     for (let id = 0; id < regionId; id++) {
         const cells: [number, number][] = [];
         for (let r = 0; r < h; r++) {
@@ -158,7 +120,6 @@ function carveBoardGuaranteed(w: number, h: number): { matrix: number[][] }[] {
                 if (grid[r][c] === id) cells.push([r, c]);
             }
         }
-
         if (cells.length > 0 && cells.length < 3) {
             let neighborId = -1;
             for (const [cr, cc] of cells) {
@@ -172,17 +133,13 @@ function carveBoardGuaranteed(w: number, h: number): { matrix: number[][] }[] {
                 }
                 if (neighborId !== -1) break;
             }
-
             if (neighborId !== -1) {
-                for (const [cr, cc] of cells) {
-                    grid[cr][cc] = neighborId;
-                }
+                for (const [cr, cc] of cells) grid[cr][cc] = neighborId;
             }
         }
     }
 
-    // Извлекаем матрицы фигур
-    const shapes: { matrix: number[][] }[] = [];
+    const shapes: PlacedResult[] = [];
     for (let id = 0; id < regionId; id++) {
         let minR = h, maxR = -1, minC = w, maxC = -1;
         for (let r = 0; r < h; r++) {
@@ -195,17 +152,15 @@ function carveBoardGuaranteed(w: number, h: number): { matrix: number[][] }[] {
                 }
             }
         }
-
         if (maxR !== -1) {
             const mat = Array.from({ length: maxR - minR + 1 }, (_, r) =>
                 Array.from({ length: maxC - minC + 1 }, (__, c) =>
                     grid[minR + r][minC + c] === id ? 1 : 0
                 )
             );
-            shapes.push({ matrix: mat });
+            shapes.push({ matrix: mat, row: minR, col: minC });
         }
     }
-
     return shapes;
 }
 
@@ -214,7 +169,6 @@ export function generateLevel(width: number = 4, height: number = 4): LevelData 
     const h = Math.max(3, Math.min(10, Math.round(height)));
     const totalCells = w * h;
 
-    // Комбинируем фигуры 3, 4 и 5 клеток для быстрой и интересной раскладки
     const baseShapes =
         totalCells <= 12
             ? [...TROMINOES, ...TETROMINOES]
@@ -222,15 +176,14 @@ export function generateLevel(width: number = 4, height: number = 4): LevelData 
 
     const allOrientations = baseShapes.flatMap(getAllOrientations);
 
-    function trySolve(): { matrix: number[][] }[] | null {
+    function trySolve(): PlacedResult[] | null {
         const board = Array.from({ length: h }, () => Array(w).fill(0));
-        const placed: { matrix: number[][] }[] = [];
+        const placed: PlacedResult[] = [];
         let iterations = 0;
 
         function solve(): boolean {
-            if (++iterations > 4000) return false;
+            if (++iterations > 3500) return false;
 
-            // Ищем первую свободную клетку сверху вниз, слева направо
             let emptyR = -1;
             let emptyC = -1;
             for (let r = 0; r < h; r++) {
@@ -244,14 +197,12 @@ export function generateLevel(width: number = 4, height: number = 4): LevelData 
                 if (emptyR !== -1) break;
             }
 
-            if (emptyR === -1) return true; // Все поле успешно заполнено!
+            if (emptyR === -1) return true;
 
             const candidates = shuffle(allOrientations);
             for (const shape of candidates) {
                 const sRows = shape.length;
                 const sCols = shape[0].length;
-
-                // Первая единица в верхней строке фигуры обязана накрыть (emptyR, emptyC)
                 const firstCol = shape[0].indexOf(1);
                 if (firstCol === -1) continue;
 
@@ -277,12 +228,9 @@ export function generateLevel(width: number = 4, height: number = 4): LevelData 
                             }
                         }
 
-                        // Если не создали тупиковых одиночных дырок — идем глубже
-                        if (!hasInvalidPockets(board, h, w)) {
-                            placed.push({ matrix: shape });
-                            if (solve()) return true;
-                            placed.pop();
-                        }
+                        placed.push({ matrix: shape, row: startR, col: startC });
+                        if (solve()) return true;
+                        placed.pop();
 
                         for (let r = 0; r < sRows; r++) {
                             for (let c = 0; c < sCols; c++) {
@@ -299,26 +247,42 @@ export function generateLevel(width: number = 4, height: number = 4): LevelData 
     }
 
     let result = trySolve();
-    for (let attempt = 0; attempt < 5 && !result; attempt++) {
+    for (let attempt = 0; attempt < 4 && !result; attempt++) {
         result = trySolve();
     }
 
-    // Если солвер не уложился в лимит, нарезаем поле гарантированным методом
-    const placedShapes = result || carveBoardGuaranteed(w, h);
+    const placedShapes: PlacedResult[] = result || carveBoardGuaranteed(w, h);
     const shuffledColors = shuffle(COLORS);
 
-    // ВАЖНО: только поворачиваем фигуры (rotate), БЕЗ зеркального отражения (flip)!
-    const pieces: Shape[] = shuffle(placedShapes).map((item, idx) => {
+    // Каждой фигуре задаем цвет и ID
+    const placedWithColors = placedShapes.map((item, idx) => ({
+        ...item,
+        color: shuffledColors[idx % shuffledColors.length],
+        id: `p_${idx}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`
+    }));
+
+    // Строим точную сетку решения
+    const solutionGrid: string[][] = Array.from({ length: h }, () => Array(w).fill('#1e293b'));
+    placedWithColors.forEach((item) => {
+        for (let r = 0; r < item.matrix.length; r++) {
+            for (let c = 0; c < item.matrix[0].length; c++) {
+                if (item.matrix[r][c] === 1 && item.row + r < h && item.col + c < w) {
+                    solutionGrid[item.row + r][item.col + c] = item.color;
+                }
+            }
+        }
+    });
+
+    // Перемешиваем фигуры для выдачи игрокам (только вращение!)
+    const pieces: Shape[] = shuffle(placedWithColors).map((item) => {
         let m = item.matrix;
         const randomRotations = Math.floor(Math.random() * 4);
-        for (let i = 0; i < randomRotations; i++) {
-            m = rotate(m);
-        }
+        for (let i = 0; i < randomRotations; i++) m = rotate(m);
 
         return {
-            id: `p_${idx}_${Date.now()}_${Math.random()}`,
+            id: item.id,
             matrix: m,
-            color: shuffledColors[idx % shuffledColors.length]
+            color: item.color
         };
     });
 
@@ -326,6 +290,7 @@ export function generateLevel(width: number = 4, height: number = 4): LevelData 
         gridWidth: w,
         gridHeight: h,
         targetCellsCount: totalCells,
-        pieces
+        pieces,
+        solutionGrid
     };
 }
