@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { socket } from '../socket';
 
 interface Player {
@@ -20,32 +20,161 @@ interface LobbyProps {
     onStartGame: (width: number, height: number) => void;
 }
 
-// Формы фигур для фона
+// Формы фигур полимино для летающего фона
 const BG_SHAPES = [
-    { matrix: [[1, 1], [1, 1]], color: '#38bdf8' },               // O (голубой)
+    { matrix: [[1, 1], [1, 1]], color: '#38bdf8' },               // O (лазурный)
     { matrix: [[1, 1, 1, 1]], color: '#ec4899' },                 // I (розовый)
     { matrix: [[1, 1, 1], [0, 1, 0]], color: '#a855f7' },         // T (фиолетовый)
-    { matrix: [[1, 1, 0], [0, 1, 1]], color: '#10b981' },         // Z (зеленый)
+    { matrix: [[1, 1, 0], [0, 1, 1]], color: '#10b981' },         // Z (изумрудный)
     { matrix: [[0, 1], [0, 1], [1, 1]], color: '#f59e0b' },         // L (янтарный)
     { matrix: [[0, 1, 0], [1, 1, 1], [0, 1, 0]], color: '#06b6d4' }, // Крест
-    { matrix: [[1, 1, 1], [1, 0, 0]], color: '#ef4444' }          // J (красный)
+    { matrix: [[1, 1, 1], [1, 0, 0]], color: '#ef4444' }          // J (коралловый)
 ];
 
-// 12 фигур с фиксированными безопасными анимациями
-const FLOATING_ITEMS = [
-    { shapeIdx: 0, left: 2, size: 32, dur: 20, delay: -3, anim: 'mobTrackA', opacity: 0.65 },
-    { shapeIdx: 1, left: 14, size: 28, dur: 24, delay: -15, anim: 'mobTrackB', opacity: 0.55 },
-    { shapeIdx: 2, left: 88, size: 30, dur: 19, delay: -8, anim: 'mobTrackC', opacity: 0.65 },
-    { shapeIdx: 3, left: 93, size: 26, dur: 23, delay: -18, anim: 'mobTrackD', opacity: 0.58 },
-    { shapeIdx: 4, left: 6, size: 34, dur: 21, delay: -5, anim: 'mobTrackB', opacity: 0.60 },
-    { shapeIdx: 5, left: 82, size: 28, dur: 26, delay: -12, anim: 'mobTrackA', opacity: 0.55 },
-    { shapeIdx: 6, left: 50, size: 32, dur: 20, delay: -2, anim: 'mobTrackC', opacity: 0.60 },
-    { shapeIdx: 1, left: 24, size: 30, dur: 25, delay: -16, anim: 'mobTrackD', opacity: 0.55 },
-    { shapeIdx: 0, left: 74, size: 34, dur: 18, delay: -9, anim: 'mobTrackA', opacity: 0.65 },
-    { shapeIdx: 2, left: 10, size: 28, dur: 23, delay: -21, anim: 'mobTrackB', opacity: 0.58 },
-    { shapeIdx: 4, left: 40, size: 30, dur: 21, delay: -14, anim: 'mobTrackC', opacity: 0.55 },
-    { shapeIdx: 3, left: 91, size: 32, dur: 22, delay: -6, anim: 'mobTrackD', opacity: 0.62 }
-];
+// Автономный фоновый холст Canvas (гарантированные 60 FPS на любом телефоне)
+const SpaceCanvasBackground: React.FC = () => {
+    const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        let animId: number;
+        let width = (canvas.width = window.innerWidth);
+        let height = (canvas.height = window.innerHeight);
+
+        const handleResize = () => {
+            if (!canvas) return;
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        };
+        window.addEventListener('resize', handleResize);
+
+        // 14 фигур, сразу распределенных по всей площади экрана
+        const items = Array.from({ length: 14 }, (_, i) => {
+            const shape = BG_SHAPES[i % BG_SHAPES.length];
+            const cellSize = 22 + Math.floor(Math.random() * 8); // 22-30px
+            return {
+                shape,
+                cellSize,
+                x: Math.random() * width,
+                y: Math.random() * height, // Сразу видны на экране при открытии!
+                speedY: 0.5 + Math.random() * 0.7,
+                speedX: (Math.random() - 0.5) * 0.25,
+                rot: Math.random() * Math.PI * 2,
+                rotSpeed: (Math.random() - 0.5) * 0.012,
+                opacity: 0.45 + Math.random() * 0.25
+            };
+        });
+
+        const drawRoundedRect = (x: number, y: number, s: number, r: number) => {
+            ctx.beginPath();
+            ctx.moveTo(x + r, y);
+            ctx.lineTo(x + s - r, y);
+            ctx.arcTo(x + s, y, x + s, y + s, r);
+            ctx.lineTo(x + s, y + s - r);
+            ctx.arcTo(x + s, y + s, x, y + s, r);
+            ctx.lineTo(x + r, y + s);
+            ctx.arcTo(x, y + s, x, y, r);
+            ctx.lineTo(x, y + r);
+            ctx.arcTo(x, y, x + s, y, r);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+        };
+
+        const render = () => {
+            ctx.clearRect(0, 0, width, height);
+
+            // Фоновые мягкие неоновые туманности (Ambient Glow)
+            const grad1 = ctx.createRadialGradient(width * 0.2, height * 0.2, 10, width * 0.2, height * 0.2, 300);
+            grad1.addColorStop(0, 'rgba(56, 189, 248, 0.20)');
+            grad1.addColorStop(1, 'transparent');
+            ctx.fillStyle = grad1;
+            ctx.fillRect(0, 0, width, height);
+
+            const grad2 = ctx.createRadialGradient(width * 0.8, height * 0.8, 10, width * 0.8, height * 0.8, 320);
+            grad2.addColorStop(0, 'rgba(168, 85, 247, 0.18)');
+            grad2.addColorStop(1, 'transparent');
+            ctx.fillStyle = grad2;
+            ctx.fillRect(0, 0, width, height);
+
+            // Отрисовка парящих фигур
+            items.forEach((item) => {
+                item.y -= item.speedY;
+                item.x += item.speedX;
+                item.rot += item.rotSpeed;
+
+                if (item.y < -120) {
+                    item.y = height + 100;
+                    item.x = Math.random() * width;
+                }
+                if (item.x < -80) item.x = width + 80;
+                if (item.x > width + 80) item.x = -80;
+
+                const { matrix, color } = item.shape;
+                const s = item.cellSize;
+                const gap = 3;
+                const rows = matrix.length;
+                const cols = matrix[0].length;
+                const totalW = cols * s + (cols - 1) * gap;
+                const totalH = rows * s + (rows - 1) * gap;
+
+                ctx.save();
+                ctx.translate(item.x, item.y);
+                ctx.rotate(item.rot);
+                ctx.globalAlpha = item.opacity;
+
+                ctx.shadowColor = color;
+                ctx.shadowBlur = 12;
+                ctx.fillStyle = color;
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+                ctx.lineWidth = 1.5;
+
+                const startX = -totalW / 2;
+                const startY = -totalH / 2;
+
+                for (let r = 0; r < rows; r++) {
+                    for (let c = 0; c < cols; c++) {
+                        if (matrix[r][c] === 1) {
+                            const cellX = startX + c * (s + gap);
+                            const cellY = startY + r * (s + gap);
+                            drawRoundedRect(cellX, cellY, s, 5);
+                        }
+                    }
+                }
+
+                ctx.restore();
+            });
+
+            animId = requestAnimationFrame(render);
+        };
+
+        render();
+
+        return () => {
+            cancelAnimationFrame(animId);
+            window.removeEventListener('resize', handleResize);
+        };
+    }, []);
+
+    return (
+        <canvas
+            ref={canvasRef}
+            style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%',
+                pointerEvents: 'none',
+                zIndex: 1
+            }}
+        />
+    );
+};
 
 export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
     const [name, setName] = useState(localStorage.getItem('gc_name') || '');
@@ -114,29 +243,6 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
             }}
         >
             <style>{`
-        /* 100% чистый CSS без var() — работает на любом Android Chrome и iPhone Safari */
-        @keyframes mobTrackA {
-          0% { transform: translate3d(0, 108vh, 0) rotate(0deg); }
-          100% { transform: translate3d(30px, -28vh, 0) rotate(360deg); }
-        }
-        @keyframes mobTrackB {
-          0% { transform: translate3d(0, 108vh, 0) rotate(0deg); }
-          100% { transform: translate3d(-35px, -28vh, 0) rotate(-270deg); }
-        }
-        @keyframes mobTrackC {
-          0% { transform: translate3d(0, 108vh, 0) rotate(0deg); }
-          100% { transform: translate3d(20px, -28vh, 0) rotate(180deg); }
-        }
-        @keyframes mobTrackD {
-          0% { transform: translate3d(0, 108vh, 0) rotate(0deg); }
-          100% { transform: translate3d(-20px, -28vh, 0) rotate(-360deg); }
-        }
-
-        @keyframes ambientPulse {
-          0%, 100% { transform: scale(1); opacity: 0.35; }
-          50% { transform: scale(1.15); opacity: 0.55; }
-        }
-
         .primary-btn {
           transition: transform 0.15s ease, filter 0.15s ease;
         }
@@ -145,97 +251,17 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
         }
       `}</style>
 
-            {/* 1. Атмосферное космическое свечение */}
-            <div
-                style={{
-                    position: 'fixed',
-                    top: '10%',
-                    left: '15%',
-                    width: 340,
-                    height: 340,
-                    borderRadius: '50%',
-                    background: 'radial-gradient(circle, rgba(56, 189, 248, 0.22) 0%, transparent 70%)',
-                    filter: 'blur(60px)',
-                    pointerEvents: 'none',
-                    animation: 'ambientPulse 8s ease-in-out infinite'
-                }}
-            />
-            <div
-                style={{
-                    position: 'fixed',
-                    bottom: '10%',
-                    right: '10%',
-                    width: 360,
-                    height: 360,
-                    borderRadius: '50%',
-                    background: 'radial-gradient(circle, rgba(168, 85, 247, 0.2) 0%, transparent 70%)',
-                    filter: 'blur(70px)',
-                    pointerEvents: 'none',
-                    animation: 'ambientPulse 11s ease-in-out infinite reverse'
-                }}
-            />
+            {/* 1. Безотказный Canvas-фон с фигурами */}
+            <SpaceCanvasBackground />
 
-            {/* 2. Летающие неоновые полимино */}
-            <div
-                style={{
-                    position: 'fixed',
-                    inset: 0,
-                    pointerEvents: 'none',
-                    overflow: 'hidden',
-                    zIndex: 1
-                }}
-            >
-                {FLOATING_ITEMS.map((item, idx) => {
-                    const shape = BG_SHAPES[item.shapeIdx];
-                    const cellSize = item.size;
-                    const gap = 3;
-
-                    return (
-                        <div
-                            key={idx}
-                            style={{
-                                position: 'absolute',
-                                left: `${item.left}%`,
-                                top: 0,
-                                opacity: item.opacity,
-                                willChange: 'transform',
-                                animation: `${item.anim} ${item.dur}s linear infinite`,
-                                animationDelay: `${item.delay}s`,
-                                display: 'grid',
-                                gridTemplateColumns: `repeat(${shape.matrix[0].length}, ${cellSize}px)`,
-                                gap: `${gap}px`
-                            }}
-                        >
-                            {shape.matrix.map((row, r) =>
-                                row.map((val, c) => (
-                                    <div
-                                        key={`${r}-${c}`}
-                                        style={{
-                                            width: cellSize,
-                                            height: cellSize,
-                                            borderRadius: 7,
-                                            background: val ? shape.color : 'transparent',
-                                            boxShadow: val
-                                                ? `0 0 14px ${shape.color}, inset 0 0 6px rgba(255, 255, 255, 0.65)`
-                                                : 'none',
-                                            border: val ? '1.5px solid rgba(255, 255, 255, 0.35)' : 'none'
-                                        }}
-                                    />
-                                ))
-                            )}
-                        </div>
-                    );
-                })}
-            </div>
-
-            {/* 3. Карточка меню */}
+            {/* 2. Карточка меню со стеклянным эффектом */}
             <div
                 style={{
                     position: 'relative',
                     zIndex: 2,
-                    background: 'rgba(15, 23, 42, 0.60)',
-                    backdropFilter: 'blur(14px)',
-                    WebkitBackdropFilter: 'blur(14px)',
+                    background: 'rgba(15, 23, 42, 0.62)',
+                    backdropFilter: 'blur(16px)',
+                    WebkitBackdropFilter: 'blur(16px)',
                     padding: room ? 20 : 28,
                     borderRadius: 24,
                     maxWidth: 390,
@@ -245,7 +271,6 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                 }}
             >
                 {!room ? (
-                    /* ЭКРАН 1: ВХОД / СОЗДАНИЕ */
                     <div>
                         <div style={{ textAlign: 'center', marginBottom: 22 }}>
                             <h1
@@ -388,7 +413,6 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                         </div>
                     </div>
                 ) : (
-                    /* ЭКРАН 2: ЛОББИ ОЖИДАНИЯ */
                     <div>
                         <div style={{ textAlign: 'center', marginBottom: 18 }}>
                             <span
@@ -416,7 +440,6 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                             </div>
                         </div>
 
-                        {/* Настройки поля */}
                         {isHost && (
                             <div
                                 style={{
@@ -548,7 +571,6 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                             </div>
                         )}
 
-                        {/* Игроки */}
                         <div style={{ marginBottom: 20 }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#94a3b8', marginBottom: 8 }}>
                                 <span>Игроки в лобби:</span>
@@ -579,7 +601,6 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                             </div>
                         </div>
 
-                        {/* Кнопка запуска */}
                         {isHost ? (
                             <button
                                 type="button"
