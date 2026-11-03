@@ -388,7 +388,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
             const frozen: Record<string, number> = {};
             piecesRef.current.forEach((p) => {
                 if (p.row === null) {
-                    frozen[p.id] = 2; // 2 нажатия, чтобы расколоть лёд
+                    frozen[p.id] = 3; // 2 нажатия, чтобы расколоть лёд
                 }
             });
             setFrozenPieces(frozen);
@@ -513,7 +513,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 
                     const playerCount = Object.keys(players).length;
                     if (playerCount >= 2 && current !== 'SWAP') {
-                        weightedPool.push('SWAP');
+                        weightedPool.push('SWAP', 'SWAP');
                     }
 
                     const nextEvent = weightedPool[Math.floor(Math.random() * weightedPool.length)];
@@ -1085,7 +1085,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                                             ? 0.45
                                             : 0.65
                                         : cell.color && isGhostMode
-                                            ? 0.16
+                                            ? 0.07
                                             : 1,
                                     border: isGhostCell
                                         ? isGhostValid
@@ -1203,7 +1203,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                                         transform: activeEvent === 'FLIP' ? 'rotate(180deg)' : 'none',
                                         transition: 'transform 0.3s ease',
                                         pointerEvents: 'none',
-                                        opacity: isGhostMode ? 0.18 : isFrozen ? 0.65 : 1,
+                                        opacity: isGhostMode ? 0.07 : isFrozen ? 0.65 : 1,
                                         filter: isFrozen ? 'saturate(0.4) brightness(1.3)' : 'none'
                                     }}
                                 >

@@ -22,29 +22,29 @@ interface LobbyProps {
 
 // Формы фигур для фона
 const BG_SHAPES = [
-    { matrix: [[1, 1], [1, 1]], color: '#38bdf8' },               // O (лазурный)
+    { matrix: [[1, 1], [1, 1]], color: '#38bdf8' },               // O (голубой)
     { matrix: [[1, 1, 1, 1]], color: '#ec4899' },                 // I (розовый)
     { matrix: [[1, 1, 1], [0, 1, 0]], color: '#a855f7' },         // T (фиолетовый)
-    { matrix: [[1, 1, 0], [0, 1, 1]], color: '#10b981' },         // Z (изумрудный)
+    { matrix: [[1, 1, 0], [0, 1, 1]], color: '#10b981' },         // Z (зеленый)
     { matrix: [[0, 1], [0, 1], [1, 1]], color: '#f59e0b' },         // L (янтарный)
-    { matrix: [[0, 1, 0], [1, 1, 1], [0, 1, 0]], color: '#06b6d4' }, // Плюс / Крест
-    { matrix: [[1, 1, 1], [1, 0, 0]], color: '#ef4444' }          // J (коралловый)
+    { matrix: [[0, 1, 0], [1, 1, 1], [0, 1, 0]], color: '#06b6d4' }, // Крест
+    { matrix: [[1, 1, 1], [1, 0, 0]], color: '#ef4444' }          // J (красный)
 ];
 
-// 12 фигур: непрерывное плавное движение по всему экрану
+// 12 фигур с фиксированными безопасными анимациями
 const FLOATING_ITEMS = [
-    { shapeIdx: 0, left: 4, size: 32, dur: 20, delay: -3, rot: 180, sway: 35, opacity: 0.65 },
-    { shapeIdx: 1, left: 16, size: 28, dur: 24, delay: -15, rot: 360, sway: -30, opacity: 0.60 },
-    { shapeIdx: 2, left: 28, size: 30, dur: 19, delay: -8, rot: -240, sway: 40, opacity: 0.68 },
-    { shapeIdx: 3, left: 42, size: 26, dur: 23, delay: -18, rot: 270, sway: -25, opacity: 0.58 },
-    { shapeIdx: 4, left: 54, size: 34, dur: 21, delay: -5, rot: -180, sway: 30, opacity: 0.62 },
-    { shapeIdx: 5, left: 66, size: 28, dur: 26, delay: -12, rot: 360, sway: -35, opacity: 0.60 },
-    { shapeIdx: 6, left: 76, size: 32, dur: 20, delay: -2, rot: -300, sway: 25, opacity: 0.66 },
-    { shapeIdx: 1, left: 86, size: 30, dur: 25, delay: -16, rot: 240, sway: -30, opacity: 0.62 },
-    { shapeIdx: 0, left: 93, size: 34, dur: 18, delay: -9, rot: -270, sway: 20, opacity: 0.70 },
-    { shapeIdx: 2, left: 10, size: 28, dur: 23, delay: -21, rot: 180, sway: -32, opacity: 0.58 },
-    { shapeIdx: 4, left: 48, size: 30, dur: 21, delay: -14, rot: 320, sway: 35, opacity: 0.60 },
-    { shapeIdx: 3, left: 88, size: 32, dur: 22, delay: -6, rot: -190, sway: -22, opacity: 0.64 }
+    { shapeIdx: 0, left: 2, size: 32, dur: 20, delay: -3, anim: 'mobTrackA', opacity: 0.65 },
+    { shapeIdx: 1, left: 14, size: 28, dur: 24, delay: -15, anim: 'mobTrackB', opacity: 0.55 },
+    { shapeIdx: 2, left: 88, size: 30, dur: 19, delay: -8, anim: 'mobTrackC', opacity: 0.65 },
+    { shapeIdx: 3, left: 93, size: 26, dur: 23, delay: -18, anim: 'mobTrackD', opacity: 0.58 },
+    { shapeIdx: 4, left: 6, size: 34, dur: 21, delay: -5, anim: 'mobTrackB', opacity: 0.60 },
+    { shapeIdx: 5, left: 82, size: 28, dur: 26, delay: -12, anim: 'mobTrackA', opacity: 0.55 },
+    { shapeIdx: 6, left: 50, size: 32, dur: 20, delay: -2, anim: 'mobTrackC', opacity: 0.60 },
+    { shapeIdx: 1, left: 24, size: 30, dur: 25, delay: -16, anim: 'mobTrackD', opacity: 0.55 },
+    { shapeIdx: 0, left: 74, size: 34, dur: 18, delay: -9, anim: 'mobTrackA', opacity: 0.65 },
+    { shapeIdx: 2, left: 10, size: 28, dur: 23, delay: -21, anim: 'mobTrackB', opacity: 0.58 },
+    { shapeIdx: 4, left: 40, size: 30, dur: 21, delay: -14, anim: 'mobTrackC', opacity: 0.55 },
+    { shapeIdx: 3, left: 91, size: 32, dur: 22, delay: -6, anim: 'mobTrackD', opacity: 0.62 }
 ];
 
 export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
@@ -107,21 +107,29 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                padding: 20,
+                padding: 16,
                 boxSizing: 'border-box',
                 overflow: 'hidden',
                 background: 'radial-gradient(ellipse at 50% 25%, #1e1b4b 0%, #090d1a 60%, #030712 100%)'
             }}
         >
             <style>{`
-        /* Непрерывный равномерный полёт снизу до самого верха БЕЗ остановок */
-        @keyframes smoothLinearFloat {
-          0% {
-            transform: translate3d(0, 108vh, 0) rotate(0deg);
-          }
-          100% {
-            transform: translate3d(var(--item-sway, 25px), -28vh, 0) rotate(var(--item-rot, 360deg));
-          }
+        /* 100% чистый CSS без var() — работает на любом Android Chrome и iPhone Safari */
+        @keyframes mobTrackA {
+          0% { transform: translate3d(0, 108vh, 0) rotate(0deg); }
+          100% { transform: translate3d(30px, -28vh, 0) rotate(360deg); }
+        }
+        @keyframes mobTrackB {
+          0% { transform: translate3d(0, 108vh, 0) rotate(0deg); }
+          100% { transform: translate3d(-35px, -28vh, 0) rotate(-270deg); }
+        }
+        @keyframes mobTrackC {
+          0% { transform: translate3d(0, 108vh, 0) rotate(0deg); }
+          100% { transform: translate3d(20px, -28vh, 0) rotate(180deg); }
+        }
+        @keyframes mobTrackD {
+          0% { transform: translate3d(0, 108vh, 0) rotate(0deg); }
+          100% { transform: translate3d(-20px, -28vh, 0) rotate(-360deg); }
         }
 
         @keyframes ambientPulse {
@@ -130,28 +138,24 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
         }
 
         .primary-btn {
-          transition: transform 0.15s ease, filter 0.15s ease, box-shadow 0.15s ease;
-        }
-        .primary-btn:hover {
-          transform: translateY(-1px);
-          filter: brightness(1.1);
+          transition: transform 0.15s ease, filter 0.15s ease;
         }
         .primary-btn:active {
           transform: scale(0.97);
         }
       `}</style>
 
-            {/* 1. Атмосферное фоновое свечение космоса */}
+            {/* 1. Атмосферное космическое свечение */}
             <div
                 style={{
                     position: 'fixed',
                     top: '10%',
                     left: '15%',
-                    width: 400,
-                    height: 400,
+                    width: 340,
+                    height: 340,
                     borderRadius: '50%',
                     background: 'radial-gradient(circle, rgba(56, 189, 248, 0.22) 0%, transparent 70%)',
-                    filter: 'blur(70px)',
+                    filter: 'blur(60px)',
                     pointerEvents: 'none',
                     animation: 'ambientPulse 8s ease-in-out infinite'
                 }}
@@ -161,17 +165,17 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                     position: 'fixed',
                     bottom: '10%',
                     right: '10%',
-                    width: 440,
-                    height: 440,
+                    width: 360,
+                    height: 360,
                     borderRadius: '50%',
                     background: 'radial-gradient(circle, rgba(168, 85, 247, 0.2) 0%, transparent 70%)',
-                    filter: 'blur(80px)',
+                    filter: 'blur(70px)',
                     pointerEvents: 'none',
                     animation: 'ambientPulse 11s ease-in-out infinite reverse'
                 }}
             />
 
-            {/* 2. Яркие летающие фигуры со свечением */}
+            {/* 2. Летающие неоновые полимино */}
             <div
                 style={{
                     position: 'fixed',
@@ -195,15 +199,11 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                                 top: 0,
                                 opacity: item.opacity,
                                 willChange: 'transform',
-                                // @ts-ignore
-                                '--item-rot': `${item.rot}deg`,
-                                '--item-sway': `${item.sway}px`,
-                                animation: `smoothLinearFloat ${item.dur}s linear infinite`,
+                                animation: `${item.anim} ${item.dur}s linear infinite`,
                                 animationDelay: `${item.delay}s`,
                                 display: 'grid',
                                 gridTemplateColumns: `repeat(${shape.matrix[0].length}, ${cellSize}px)`,
-                                gap: `${gap}px`,
-                                filter: `drop-shadow(0 0 16px ${shape.color})`
+                                gap: `${gap}px`
                             }}
                         >
                             {shape.matrix.map((row, r) =>
@@ -233,10 +233,10 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                 style={{
                     position: 'relative',
                     zIndex: 2,
-                    background: 'rgba(15, 23, 42, 0.65)',
-                    backdropFilter: 'blur(16px)',
-                    WebkitBackdropFilter: 'blur(16px)',
-                    padding: room ? 24 : 32,
+                    background: 'rgba(15, 23, 42, 0.60)',
+                    backdropFilter: 'blur(14px)',
+                    WebkitBackdropFilter: 'blur(14px)',
+                    padding: room ? 20 : 28,
                     borderRadius: 24,
                     maxWidth: 390,
                     width: '100%',
@@ -277,8 +277,7 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                                     fontSize: 13,
                                     marginBottom: 16,
                                     textAlign: 'center',
-                                    border: '1px solid rgba(239, 68, 68, 0.45)',
-                                    backdropFilter: 'blur(10px)'
+                                    border: '1px solid rgba(239, 68, 68, 0.45)'
                                 }}
                             >
                                 {error}
@@ -300,11 +299,8 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                                     color: '#fff',
                                     fontSize: 16,
                                     outline: 'none',
-                                    boxShadow: 'inset 0 2px 6px rgba(0,0,0,0.4)',
-                                    transition: 'border 0.2s ease'
+                                    boxShadow: 'inset 0 2px 6px rgba(0,0,0,0.4)'
                                 }}
-                                onFocus={(e) => (e.target.style.borderColor = '#38bdf8')}
-                                onBlur={(e) => (e.target.style.borderColor = 'rgba(255, 255, 255, 0.15)')}
                             />
 
                             <button
@@ -369,8 +365,6 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                                         outline: 'none',
                                         boxShadow: 'inset 0 2px 6px rgba(0,0,0,0.4)'
                                     }}
-                                    onFocus={(e) => (e.target.style.borderColor = '#38bdf8')}
-                                    onBlur={(e) => (e.target.style.borderColor = 'rgba(255, 255, 255, 0.15)')}
                                 />
                                 <button
                                     type="button"
@@ -455,8 +449,7 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                                                     fontWeight: 700,
                                                     fontSize: 12,
                                                     cursor: 'pointer',
-                                                    boxShadow: isActive ? '0 0 12px rgba(56, 189, 248, 0.4)' : 'none',
-                                                    transition: 'all 0.15s ease'
+                                                    boxShadow: isActive ? '0 0 12px rgba(56, 189, 248, 0.4)' : 'none'
                                                 }}
                                             >
                                                 {size}×{size}
@@ -465,7 +458,6 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                                     })}
                                 </div>
 
-                                {/* Точные размеры */}
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                         <span style={{ fontSize: 13, color: '#e2e8f0' }}>Ширина:</span>
@@ -482,8 +474,7 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                                                     color: '#fff',
                                                     border: 'none',
                                                     fontSize: 16,
-                                                    fontWeight: 700,
-                                                    cursor: gridWidth <= 3 ? 'not-allowed' : 'pointer'
+                                                    fontWeight: 700
                                                 }}
                                             >
                                                 −
@@ -503,8 +494,7 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                                                     color: '#fff',
                                                     border: 'none',
                                                     fontSize: 16,
-                                                    fontWeight: 700,
-                                                    cursor: gridWidth >= 10 ? 'not-allowed' : 'pointer'
+                                                    fontWeight: 700
                                                 }}
                                             >
                                                 +
@@ -527,8 +517,7 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                                                     color: '#fff',
                                                     border: 'none',
                                                     fontSize: 16,
-                                                    fontWeight: 700,
-                                                    cursor: gridHeight <= 3 ? 'not-allowed' : 'pointer'
+                                                    fontWeight: 700
                                                 }}
                                             >
                                                 −
@@ -548,8 +537,7 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                                                     color: '#fff',
                                                     border: 'none',
                                                     fontSize: 16,
-                                                    fontWeight: 700,
-                                                    cursor: gridHeight >= 10 ? 'not-allowed' : 'pointer'
+                                                    fontWeight: 700
                                                 }}
                                             >
                                                 +
