@@ -28,7 +28,7 @@ io.on('connection', (socket) => {
     socket.on('create_room', ({ playerName }) => {
         const room = roomManager.createRoom({ id: socket.id, name: playerName });
         socket.join(room.code);
-        socket.emit('room_Joined', room);
+        socket.emit('room_joined', room); // ✅ Исправлено на строчную j
     });
 
     socket.on('join_room', ({ code, playerName }) => {
@@ -39,7 +39,7 @@ io.on('connection', (socket) => {
         }
         socket.join(room.code);
         io.to(room.code).emit('room_updated', room);
-        socket.emit('room_Joined', room);
+        socket.emit('room_joined', room); // ✅ Исправлено на строчную j
     });
 
     socket.on('start_game', ({ code, width, height }) => {
