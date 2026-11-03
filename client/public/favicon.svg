@@ -1,0 +1,61 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <radialGradient id="bgGlow" cx="50%" cy="40%" r="65%">
+      <stop offset="0%" stop-color="#1e1b4b"/>
+      <stop offset="60%" stop-color="#0b1120"/>
+      <stop offset="100%" stop-color="#030712"/>
+    </radialGradient>
+    <linearGradient id="cyanGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7dd3fc"/>
+      <stop offset="100%" stop-color="#0284c7"/>
+    </linearGradient>
+    <linearGradient id="pinkGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f472b6"/>
+      <stop offset="100%" stop-color="#be185d"/>
+    </linearGradient>
+    <linearGradient id="sparkGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fef08a"/>
+      <stop offset="100%" stop-color="#f59e0b"/>
+    </linearGradient>
+    <filter id="glowCyan" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="14" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+    <filter id="glowPink" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="14" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+    <filter id="glowSpark" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+  <rect x="16" y="16" width="480" height="480" rx="112" fill="url(#bgGlow)"/>
+  <rect x="16" y="16" width="480" height="480" rx="112" fill="none" stroke="rgba(56, 189, 248, 0.28)" stroke-width="4"/>
+  <g opacity="0.18" stroke="#38bdf8" stroke-width="2" stroke-dasharray="4 8">
+    <line x1="136" y1="136" x2="136" y2="376"/>
+    <line x1="216" y1="136" x2="216" y2="376"/>
+    <line x1="296" y1="136" x2="296" y2="376"/>
+    <line x1="376" y1="136" x2="376" y2="376"/>
+    <line x1="136" y1="136" x2="376" y2="136"/>
+    <line x1="136" y1="216" x2="376" y2="216"/>
+    <line x1="136" y1="296" x2="376" y2="296"/>
+    <line x1="136" y1="376" x2="376" y2="376"/>
+  </g>
+  <g filter="url(#glowCyan)">
+    <rect x="140" y="140" width="72" height="72" rx="16" fill="url(#cyanGrad)" stroke="rgba(255,255,255,0.7)" stroke-width="3"/>
+    <rect x="220" y="140" width="72" height="72" rx="16" fill="url(#cyanGrad)" stroke="rgba(255,255,255,0.7)" stroke-width="3"/>
+    <rect x="300" y="140" width="72" height="72" rx="16" fill="url(#cyanGrad)" stroke="rgba(255,255,255,0.7)" stroke-width="3"/>
+    <rect x="220" y="220" width="72" height="72" rx="16" fill="url(#cyanGrad)" stroke="rgba(255,255,255,0.7)" stroke-width="3"/>
+  </g>
+  <g filter="url(#glowPink)">
+    <rect x="220" y="300" width="72" height="72" rx="16" fill="url(#pinkGrad)" stroke="rgba(255,255,255,0.7)" stroke-width="3"/>
+    <rect x="300" y="300" width="72" height="72" rx="16" fill="url(#pinkGrad)" stroke="rgba(255,255,255,0.7)" stroke-width="3"/>
+    <rect x="300" y="220" width="72" height="72" rx="16" fill="url(#pinkGrad)" stroke="rgba(255,255,255,0.7)" stroke-width="3"/>
+    <rect x="140" y="300" width="72" height="72" rx="16" fill="url(#pinkGrad)" stroke="rgba(255,255,255,0.7)" stroke-width="3"/>
+  </g>
+  <g filter="url(#glowSpark)">
+    <path d="M 256,196 Q 256,256 196,256 Q 256,256 256,316 Q 256,256 316,256 Q 256,256 256,196 Z" fill="url(#sparkGrad)"/>
+    <circle cx="256" cy="256" r="8" fill="#ffffff"/>
+  </g>
+</svg>
