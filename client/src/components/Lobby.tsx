@@ -110,13 +110,14 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                 </button>
 
                 <div style={{ textAlign: 'center', color: '#64748b', fontSize: 14 }}>— ИЛИ —</div>
-
                 <input
                     type="text"
-                    placeholder="4-значный код"
-                    value={code}
-                    onChange={(e) => setCode(e.target.value.toUpperCase())}
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     maxLength={4}
+                    placeholder="4 цифры (напр. 4812)"
+                    value={code}
+                    onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
                     style={{
                         padding: 14,
                         borderRadius: 10,

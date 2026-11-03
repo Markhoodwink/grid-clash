@@ -3,12 +3,11 @@ import { Room, Player } from './types';
 export class RoomManager {
     private rooms: Map<string, Room> = new Map();
 
-    // Генерация короткого понятного кода без похожих символов (O, 0, I, 1)
+    // Генерация ровно 4 случайных цифр (от 1000 до 9999)
     private generateCode(): string {
-        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
         let code = '';
         do {
-            code = Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+            code = Math.floor(1000 + Math.random() * 9000).toString();
         } while (this.rooms.has(code));
         return code;
     }
