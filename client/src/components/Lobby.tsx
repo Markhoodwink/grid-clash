@@ -31,19 +31,20 @@ const BG_SHAPES = [
     { matrix: [[1, 1, 1], [1, 0, 0]], color: '#ef4444' }          // J (коралловый)
 ];
 
-// Крупные фигуры, равномерно распределенные по времени и экрану
+// 12 фигур, равномерно парящих по всей ширине и высоте экрана
 const FLOATING_ITEMS = [
-    { shapeIdx: 0, left: 6, size: 34, dur: 22, delay: -4, rot: 180, opacity: 0.55 },
-    { shapeIdx: 1, left: 82, size: 28, dur: 28, delay: -16, rot: 360, opacity: 0.50 },
-    { shapeIdx: 2, left: 18, size: 32, dur: 24, delay: -11, rot: -240, opacity: 0.60 },
-    { shapeIdx: 3, left: 72, size: 30, dur: 26, delay: -7, rot: 270, opacity: 0.52 },
-    { shapeIdx: 4, left: 88, size: 36, dur: 23, delay: -19, rot: 360, opacity: 0.58 },
-    { shapeIdx: 5, left: 3, size: 26, dur: 30, delay: -14, rot: -360, opacity: 0.48 },
-    { shapeIdx: 6, left: 54, size: 32, dur: 25, delay: -2, rot: 180, opacity: 0.54 },
-    { shapeIdx: 2, left: 76, size: 28, dur: 27, delay: -22, rot: -180, opacity: 0.50 },
-    { shapeIdx: 1, left: 28, size: 30, dur: 29, delay: -9, rot: 240, opacity: 0.52 },
-    { shapeIdx: 0, left: 64, size: 38, dur: 21, delay: -13, rot: -270, opacity: 0.62 },
-    { shapeIdx: 4, left: 40, size: 32, dur: 26, delay: -25, rot: 300, opacity: 0.50 }
+    { shapeIdx: 0, left: 4, size: 32, dur: 22, delay: -3, rot: 180, opacity: 0.55 },
+    { shapeIdx: 1, left: 16, size: 28, dur: 26, delay: -15, rot: 360, opacity: 0.50 },
+    { shapeIdx: 2, left: 28, size: 30, dur: 20, delay: -8, rot: -240, opacity: 0.60 },
+    { shapeIdx: 3, left: 42, size: 26, dur: 24, delay: -18, rot: 270, opacity: 0.48 },
+    { shapeIdx: 4, left: 52, size: 34, dur: 23, delay: -5, rot: -180, opacity: 0.52 },
+    { shapeIdx: 5, left: 63, size: 28, dur: 28, delay: -12, rot: 360, opacity: 0.50 },
+    { shapeIdx: 6, left: 74, size: 32, dur: 21, delay: -2, rot: -300, opacity: 0.58 },
+    { shapeIdx: 1, left: 84, size: 30, dur: 27, delay: -16, rot: 240, opacity: 0.52 },
+    { shapeIdx: 0, left: 93, size: 34, dur: 19, delay: -9, rot: -270, opacity: 0.60 },
+    { shapeIdx: 2, left: 10, size: 28, dur: 25, delay: -21, rot: 180, opacity: 0.48 },
+    { shapeIdx: 4, left: 48, size: 30, dur: 22, delay: -14, rot: 320, opacity: 0.50 },
+    { shapeIdx: 3, left: 88, size: 32, dur: 24, delay: -6, rot: -190, opacity: 0.54 }
 ];
 
 export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
@@ -113,12 +114,13 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
             }}
         >
             <style>{`
-        @keyframes floatPoly {
+        /* Полный сквозной полет снизу до самого верха экрана */
+        @keyframes fullScreenFloat {
           0% {
-            transform: translateY(115vh) rotate(0deg);
+            transform: translateY(108vh) rotate(0deg);
           }
           100% {
-            transform: translateY(-35vh) rotate(var(--item-rot, 360deg));
+            transform: translateY(-25vh) rotate(var(--item-rot, 360deg));
           }
         }
 
@@ -139,7 +141,7 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
         }
       `}</style>
 
-            {/* 1. Мягкое объемное неоновое свечение космоса */}
+            {/* 1. Объемное фоновое свечение */}
             <div
                 style={{
                     position: 'fixed',
@@ -148,7 +150,7 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                     width: 400,
                     height: 400,
                     borderRadius: '50%',
-                    background: 'radial-gradient(circle, rgba(56, 189, 248, 0.25) 0%, transparent 70%)',
+                    background: 'radial-gradient(circle, rgba(56, 189, 248, 0.22) 0%, transparent 70%)',
                     filter: 'blur(70px)',
                     pointerEvents: 'none',
                     animation: 'ambientPulse 8s ease-in-out infinite'
@@ -162,21 +164,21 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                     width: 440,
                     height: 440,
                     borderRadius: '50%',
-                    background: 'radial-gradient(circle, rgba(168, 85, 247, 0.22) 0%, transparent 70%)',
+                    background: 'radial-gradient(circle, rgba(168, 85, 247, 0.2) 0%, transparent 70%)',
                     filter: 'blur(80px)',
                     pointerEvents: 'none',
                     animation: 'ambientPulse 11s ease-in-out infinite reverse'
                 }}
             />
 
-            {/* 2. Крупные летающие тетрис-фигуры */}
+            {/* 2. Летающие фигуры на весь экран */}
             <div
                 style={{
                     position: 'fixed',
                     inset: 0,
                     pointerEvents: 'none',
                     overflow: 'hidden',
-                    zIndex: 0
+                    zIndex: 1
                 }}
             >
                 {FLOATING_ITEMS.map((item, idx) => {
@@ -190,11 +192,11 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                             style={{
                                 position: 'absolute',
                                 left: `${item.left}%`,
-                                bottom: -150,
+                                top: 0,
                                 opacity: item.opacity,
                                 // @ts-ignore
                                 '--item-rot': `${item.rot}deg`,
-                                animation: `floatPoly ${item.dur}s linear infinite`,
+                                animation: `fullScreenFloat ${item.dur}s linear infinite`,
                                 animationDelay: `${item.delay}s`,
                                 display: 'grid',
                                 gridTemplateColumns: `repeat(${shape.matrix[0].length}, ${cellSize}px)`,
@@ -212,7 +214,7 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                                             borderRadius: 6,
                                             background: val ? shape.color : 'transparent',
                                             boxShadow: val
-                                                ? `0 0 12px ${shape.color}aa, inset 0 0 8px rgba(255,255,255,0.4)`
+                                                ? `0 0 12px ${shape.color}aa, inset 0 0 8px rgba(255,255,255,0.45)`
                                                 : 'none',
                                             border: val ? '1px solid rgba(255,255,255,0.3)' : 'none'
                                         }}
@@ -224,19 +226,19 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                 })}
             </div>
 
-            {/* 3. Основная карточка */}
+            {/* 3. Карточка лобби (полупрозрачное матовое стекло) */}
             <div
                 style={{
                     position: 'relative',
                     zIndex: 2,
-                    background: 'rgba(15, 23, 42, 0.78)',
-                    backdropFilter: 'blur(26px)',
-                    WebkitBackdropFilter: 'blur(26px)',
+                    background: 'rgba(15, 23, 42, 0.62)',
+                    backdropFilter: 'blur(16px)',
+                    WebkitBackdropFilter: 'blur(16px)',
                     padding: room ? 24 : 32,
                     borderRadius: 24,
                     maxWidth: 390,
                     width: '100%',
-                    boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.85), 0 0 40px rgba(56, 189, 248, 0.15)',
+                    boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5), 0 0 30px rgba(56, 189, 248, 0.15)',
                     border: '1px solid rgba(255, 255, 255, 0.14)'
                 }}
             >
@@ -461,7 +463,7 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                                     })}
                                 </div>
 
-                                {/* Точная настройка */}
+                                {/* Точные размеры */}
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                         <span style={{ fontSize: 13, color: '#e2e8f0' }}>Ширина:</span>
