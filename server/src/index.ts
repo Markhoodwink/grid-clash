@@ -10,16 +10,7 @@ const app = express();
 app.use(cors());
 
 const clientDist = path.resolve(__dirname, '../../client/dist');
-
-app.use(express.static(clientDist, {
-    setHeaders: (res, filePath) => {
-        if (filePath.endsWith('index.html')) {
-            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-            res.setHeader('Pragma', 'no-cache');
-            res.setHeader('Expires', '0');
-        }
-    }
-}));
+app.use(express.static(clientDist));
 
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -215,9 +206,6 @@ io.on('connection', (socket) => {
 });
 
 app.get('/{*splat}', (req, res) => {
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
     res.sendFile(path.join(clientDist, 'index.html'));
 });
 
