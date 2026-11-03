@@ -18,7 +18,6 @@ export function App() {
         };
 
         const onRoomJoined = (updatedRoom: any) => {
-            console.log('Room joined:', updatedRoom);
             setRoom(updatedRoom);
             setLevel(null);
         };
@@ -28,7 +27,6 @@ export function App() {
         };
 
         const onGameStarted = ({ level: newLevel, players }: any) => {
-            console.log('Game started received:', newLevel);
             setLevel(newLevel);
             if (players) {
                 setRoom((prev: any) => (prev ? { ...prev, players, status: 'PLAYING' } : prev));
@@ -57,7 +55,6 @@ export function App() {
 
     const handleStartGame = (width: number, height: number) => {
         if (room) {
-            console.log('Отправляем start_game на сервер:', { code: room.code, width, height });
             socket.emit('start_game', { code: room.code, width, height });
         }
     };
@@ -72,6 +69,7 @@ export function App() {
                 />
             ) : (
                 <GameScreen
+                    key={level.pieces?.[0]?.id || Date.now()}
                     level={level}
                     roomCode={room?.code || ''}
                     players={room?.players || {}}

@@ -1632,13 +1632,15 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                         {isHost ? (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
                                 <button
-                                    onClick={() =>
+                                    onClick={() => {
+                                        setRoundResults(null);
+                                        setRoundWinner(null);
                                         socket.emit('start_game', {
                                             code: roomCode,
                                             width: level.gridWidth,
                                             height: level.gridHeight
-                                        })
-                                    }
+                                        });
+                                    }}
                                     style={{
                                         padding: 12,
                                         borderRadius: 12,

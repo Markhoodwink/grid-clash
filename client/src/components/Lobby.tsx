@@ -24,7 +24,8 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
     const [name, setName] = useState(localStorage.getItem('gc_name') || '');
     const [code, setCode] = useState('');
     const [error, setError] = useState('');
-    const [gridSize, setGridSize] = useState<number>(4);
+    const [gridWidth, setGridWidth] = useState<number>(4);
+    const [gridHeight, setGridHeight] = useState<number>(4);
 
     const handleCreateRoom = (e: React.FormEvent) => {
         e.preventDefault();
@@ -50,6 +51,19 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
         setError('');
         localStorage.setItem('gc_name', name.trim());
         socket.emit('join_room', { code, playerName: name.trim() });
+    };
+
+    const setPreset = (size: number) => {
+        setGridWidth(size);
+        setGridHeight(size);
+    };
+
+    const changeWidth = (delta: number) => {
+        setGridWidth((prev) => Math.max(3, Math.min(10, prev + delta)));
+    };
+
+    const changeHeight = (delta: number) => {
+        setGridHeight((prev) => Math.max(3, Math.min(10, prev + delta)));
     };
 
     // ЭКРАН 1: ВХОД / СОЗДАНИЕ
@@ -196,6 +210,7 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
     // ЭКРАН 2: ЛОББИ ОЖИДАНИЯ
     const playersList = Object.values(room.players || {});
     const isHost = room.players?.[myId]?.isHost;
+    const totalCells = gridWidth * gridHeight;
 
     return (
         <div
@@ -236,32 +251,140 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                     </div>
                 </div>
 
-                {/* Выбор размера поля для создателя */}
+                {/* Настройка размера поля для создателя комнаты */}
                 {isHost && (
-                    <div style={{ marginBottom: 18 }}>
-                        <span style={{ fontSize: 12, color: '#94a3b8', display: 'block', marginBottom: 6 }}>
-                            Размер поля:
-                        </span>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
-                            {[3, 4, 5, 6].map((size) => (
-                                <button
-                                    key={size}
-                                    type="button"
-                                    onClick={() => setGridSize(size)}
-                                    style={{
-                                        padding: '8px 0',
-                                        borderRadius: 8,
-                                        border: gridSize === size ? '2px solid #38bdf8' : '1px solid #334155',
-                                        background: gridSize === size ? '#0369a1' : '#0f172a',
-                                        color: '#fff',
-                                        fontWeight: 700,
-                                        fontSize: 13,
-                                        cursor: 'pointer'
-                                    }}
-                                >
-                                    {size}×{size}
-                                </button>
-                            ))}
+                    <div
+                        style={{
+                            marginBottom: 18,
+                            background: '#0f172a',
+                            padding: 12,
+                            borderRadius: 12,
+                            border: '1px solid #334155'
+                        }}
+                    >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                            <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600 }}>Быстрые пресеты:</span>
+                            <span style={{ fontSize: 11, color: '#38bdf8', fontWeight: 700 }}>{totalCells} клеток</span>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginBottom: 12 }}>
+                            {[3, 4, 5, 6].map((size) => {
+                                const isActive = gridWidth === size && gridHeight === size;
+                                return (
+                                    <button
+                                        key={size}
+                                        type="button"
+                                        onClick={() => setPreset(size)}
+                                        style={{
+                                            padding: '7px 0',
+                                            borderRadius: 8,
+                                            border: isActive ? '2px solid #38bdf8' : '1px solid #334155',
+                                            background: isActive ? '#0369a1' : '#1e293b',
+                                            color: '#fff',
+                                            fontWeight: 700,
+                                            fontSize: 12,
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        {size}×{size}
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        {/* Тонкая настройка ширины и высоты (3 - 10) */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            {/* Ширина */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: 13, color: '#e2e8f0' }}>Ширина:</span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <button
+                                        type="button"
+                                        onClick={() => changeWidth(-1)}
+                                        disabled={gridWidth <= 3}
+                                        style={{
+                                            width: 28,
+                                            height: 28,
+                                            borderRadius: 6,
+                                            background: gridWidth <= 3 ? '#1e293b' : '#334155',
+                                            color: '#fff',
+                                            border: 'none',
+                                            fontSize: 16,
+                                            fontWeight: 700,
+                                            cursor: gridWidth <= 3 ? 'not-allowed' : 'pointer'
+                                        }}
+                                    >
+                                        −
+                                    </button>
+                                    <span style={{ minWidth: 20, textAlign: 'center', fontWeight: 800, fontSize: 14 }}>
+                                        {gridWidth}
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={() => changeWidth(1)}
+                                        disabled={gridWidth >= 10}
+                                        style={{
+                                            width: 28,
+                                            height: 28,
+                                            borderRadius: 6,
+                                            background: gridWidth >= 10 ? '#1e293b' : '#334155',
+                                            color: '#fff',
+                                            border: 'none',
+                                            fontSize: 16,
+                                            fontWeight: 700,
+                                            cursor: gridWidth >= 10 ? 'not-allowed' : 'pointer'
+                                        }}
+                                    >
+                                        +
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Высота */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: 13, color: '#e2e8f0' }}>Высота:</span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <button
+                                        type="button"
+                                        onClick={() => changeHeight(-1)}
+                                        disabled={gridHeight <= 3}
+                                        style={{
+                                            width: 28,
+                                            height: 28,
+                                            borderRadius: 6,
+                                            background: gridHeight <= 3 ? '#1e293b' : '#334155',
+                                            color: '#fff',
+                                            border: 'none',
+                                            fontSize: 16,
+                                            fontWeight: 700,
+                                            cursor: gridHeight <= 3 ? 'not-allowed' : 'pointer'
+                                        }}
+                                    >
+                                        −
+                                    </button>
+                                    <span style={{ minWidth: 20, textAlign: 'center', fontWeight: 800, fontSize: 14 }}>
+                                        {gridHeight}
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={() => changeHeight(1)}
+                                        disabled={gridHeight >= 10}
+                                        style={{
+                                            width: 28,
+                                            height: 28,
+                                            borderRadius: 6,
+                                            background: gridHeight >= 10 ? '#1e293b' : '#334155',
+                                            color: '#fff',
+                                            border: 'none',
+                                            fontSize: 16,
+                                            fontWeight: 700,
+                                            cursor: gridHeight >= 10 ? 'not-allowed' : 'pointer'
+                                        }}
+                                    >
+                                        +
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 )}
@@ -301,10 +424,7 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                 {isHost ? (
                     <button
                         type="button"
-                        onClick={() => {
-                            console.log('Клик по кнопке Начать игру');
-                            onStartGame(gridSize, gridSize);
-                        }}
+                        onClick={() => onStartGame(gridWidth, gridHeight)}
                         style={{
                             width: '100%',
                             padding: 14,
@@ -318,7 +438,7 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                             boxShadow: '0 4px 15px rgba(225, 29, 72, 0.4)'
                         }}
                     >
-                        🚀 Начать игру ({gridSize}×{gridSize})
+                        🚀 Начать игру ({gridWidth}×{gridHeight})
                     </button>
                 ) : (
                     <div
