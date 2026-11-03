@@ -4,14 +4,14 @@ import { socket } from '../socket';
 interface Player {
     id: string;
     name: string;
-    isHost: boolean;
-    score?: number;
+    score: number;
+    isHost?: boolean;
 }
 
 interface Room {
     code: string;
-    players: Record<string, Player>;
     status: string;
+    players: Record<string, Player>;
 }
 
 interface LobbyProps {
@@ -21,332 +21,319 @@ interface LobbyProps {
 }
 
 export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
-    const [name, setName] = useState('');
+    const [name, setName] = useState(localStorage.getItem('gc_name') || '');
     const [code, setCode] = useState('');
-    const [copied, setCopied] = useState(false);
+    const [error, setError] = useState('');
+    const [gridSize, setGridSize] = useState<number>(4);
 
-    // Выбор размера поля
-    const [mode, setMode] = useState<'4x4' | '5x5' | '6x6' | 'custom'>('4x4');
-    const [customWidth, setCustomWidth] = useState(5);
-    const [customHeight, setCustomHeight] = useState(4);
-
-    const handleCreate = () => {
-        if (!name.trim()) return alert('Введите имя');
-        socket.emit('create_room', { name });
+    const handleCreateRoom = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!name.trim()) {
+            setError('Введите имя');
+            return;
+        }
+        setError('');
+        localStorage.setItem('gc_name', name.trim());
+        socket.emit('create_room', { playerName: name.trim() });
     };
 
-    const handleJoin = () => {
-        if (!name.trim()) return alert('Введите имя');
-        if (!code.trim()) return alert('Введите код комнаты');
-        socket.emit('join_room', { code: code.toUpperCase(), name });
+    const handleJoinRoom = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!name.trim()) {
+            setError('Введите имя');
+            return;
+        }
+        if (code.length !== 4) {
+            setError('Код должен состоять из 4 цифр');
+            return;
+        }
+        setError('');
+        localStorage.setItem('gc_name', name.trim());
+        socket.emit('join_room', { code, playerName: name.trim() });
     };
 
-    const handleCopyLink = () => {
-        const url = `${window.location.origin}?room=${room?.code}`;
-        navigator.clipboard.writeText(url);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-    };
-
-    const handleStart = () => {
-        let w = 4;
-        let h = 4;
-        if (mode === '5x5') { w = 5; h = 5; }
-        else if (mode === '6x6') { w = 6; h = 6; }
-        else if (mode === 'custom') { w = customWidth; h = customHeight; }
-
-        onStartGame(w, h);
-    };
-
-    // 1. Форма входа
+    // ЭКРАН 1: ВХОД / СОЗДАНИЕ
     if (!room) {
         return (
             <div
                 style={{
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: 16,
-                    padding: 24,
-                    maxWidth: 360,
-                    margin: '60px auto',
-                    boxSizing: 'border-box'
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    minHeight: '100vh',
+                    padding: 20
                 }}
             >
-                <h1 style={{ textAlign: 'center', fontSize: 32, fontWeight: 900, color: '#38bdf8' }}>
-                    Grid Clash
-                </h1>
-
-                <input
-                    type="text"
-                    placeholder="Твой никнейм"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    maxLength={12}
+                <div
                     style={{
-                        padding: 14,
-                        borderRadius: 10,
-                        border: '1px solid #334155',
                         background: '#1e293b',
-                        color: '#fff',
-                        fontSize: 16,
-                        outline: 'none'
-                    }}
-                />
-
-                <button
-                    onClick={handleCreate}
-                    style={{
-                        padding: 14,
-                        borderRadius: 10,
-                        background: '#2563eb',
-                        color: '#fff',
-                        border: 'none',
-                        fontWeight: 'bold',
-                        fontSize: 16,
-                        cursor: 'pointer'
+                        padding: 30,
+                        borderRadius: 20,
+                        maxWidth: 360,
+                        width: '100%',
+                        boxShadow: '0 10px 25px rgba(0,0,0,0.4)',
+                        border: '1px solid #334155'
                     }}
                 >
-                    Создать комнату
-                </button>
+                    <h1
+                        style={{
+                            fontSize: 28,
+                            fontWeight: 900,
+                            textAlign: 'center',
+                            marginBottom: 4,
+                            color: '#38bdf8',
+                            letterSpacing: 1
+                        }}
+                    >
+                        GRID CLASH
+                    </h1>
+                    <p style={{ textAlign: 'center', color: '#94a3b8', fontSize: 13, marginBottom: 20 }}>
+                        Собирай фигуры быстрее соперников
+                    </p>
 
-                <div style={{ textAlign: 'center', color: '#64748b', fontSize: 14 }}>— ИЛИ —</div>
-                <input
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    maxLength={4}
-                    placeholder="4 цифры (напр. 4812)"
-                    value={code}
-                    onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
-                    style={{
-                        padding: 14,
-                        borderRadius: 10,
-                        border: '1px solid #334155',
-                        background: '#1e293b',
-                        color: '#fff',
-                        textAlign: 'center',
-                        fontSize: 20,
-                        letterSpacing: 4,
-                        outline: 'none'
-                    }}
-                />
+                    {error && (
+                        <div
+                            style={{
+                                background: 'rgba(239, 68, 68, 0.2)',
+                                color: '#f87171',
+                                padding: '8px 12px',
+                                borderRadius: 8,
+                                fontSize: 13,
+                                marginBottom: 16,
+                                textAlign: 'center',
+                                border: '1px solid rgba(239, 68, 68, 0.4)'
+                            }}
+                        >
+                            {error}
+                        </div>
+                    )}
 
-                <button
-                    onClick={handleJoin}
-                    style={{
-                        padding: 14,
-                        borderRadius: 10,
-                        background: '#059669',
-                        color: '#fff',
-                        border: 'none',
-                        fontWeight: 'bold',
-                        fontSize: 16,
-                        cursor: 'pointer'
-                    }}
-                >
-                    Войти по коду
-                </button>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                        <input
+                            type="text"
+                            placeholder="Ваш никнейм"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            maxLength={12}
+                            style={{
+                                padding: 12,
+                                borderRadius: 10,
+                                border: '1px solid #334155',
+                                background: '#0f172a',
+                                color: '#fff',
+                                fontSize: 16,
+                                outline: 'none'
+                            }}
+                        />
+
+                        <button
+                            type="button"
+                            onClick={handleCreateRoom}
+                            style={{
+                                padding: 13,
+                                borderRadius: 10,
+                                background: '#0284c7',
+                                color: '#fff',
+                                border: 'none',
+                                fontWeight: 700,
+                                fontSize: 15,
+                                cursor: 'pointer'
+                            }}
+                        >
+                            👑 Создать комнату
+                        </button>
+
+                        <div style={{ textAlign: 'center', color: '#64748b', fontSize: 13 }}>— ИЛИ —</div>
+
+                        <div style={{ display: 'flex', gap: 8 }}>
+                            <input
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                maxLength={4}
+                                placeholder="4 цифры"
+                                value={code}
+                                onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+                                style={{
+                                    width: '50%',
+                                    padding: 12,
+                                    borderRadius: 10,
+                                    border: '1px solid #334155',
+                                    background: '#0f172a',
+                                    color: '#fff',
+                                    textAlign: 'center',
+                                    fontSize: 18,
+                                    fontWeight: 'bold',
+                                    letterSpacing: 2,
+                                    outline: 'none'
+                                }}
+                            />
+                            <button
+                                type="button"
+                                onClick={handleJoinRoom}
+                                style={{
+                                    width: '50%',
+                                    padding: 12,
+                                    borderRadius: 10,
+                                    background: '#334155',
+                                    color: '#fff',
+                                    border: 'none',
+                                    fontWeight: 700,
+                                    fontSize: 14,
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                Войти по коду
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
         );
     }
 
-    const isHost = room.players[myId]?.isHost;
-    const playerList = Object.values(room.players).sort((a, b) => (b.score || 0) - (a.score || 0));
+    // ЭКРАН 2: ЛОББИ ОЖИДАНИЯ
+    const playersList = Object.values(room.players || {});
+    const isHost = room.players?.[myId]?.isHost;
 
-    // 2. Экран лобби ожидания
     return (
         <div
             style={{
-                padding: 20,
-                maxWidth: 420,
-                margin: '20px auto',
-                textAlign: 'center',
-                boxSizing: 'border-box'
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                minHeight: '100vh',
+                padding: 20
             }}
         >
-            <p style={{ color: '#94a3b8', fontSize: 13 }}>Код для подключения:</p>
-            <h2 style={{ fontSize: 44, letterSpacing: 6, color: '#38bdf8', margin: '4px 0 12px' }}>
-                {room.code}
-            </h2>
-
-            <button
-                onClick={handleCopyLink}
+            <div
                 style={{
-                    padding: '8px 16px',
-                    borderRadius: 8,
-                    background: copied ? '#059669' : '#1e293b',
-                    color: copied ? '#fff' : '#94a3b8',
-                    border: '1px solid #334155',
-                    fontSize: 13,
-                    cursor: 'pointer',
-                    marginBottom: 20,
-                    transition: 'all 0.2s ease'
+                    background: '#1e293b',
+                    padding: 24,
+                    borderRadius: 20,
+                    maxWidth: 380,
+                    width: '100%',
+                    boxShadow: '0 10px 25px rgba(0,0,0,0.4)',
+                    border: '1px solid #334155'
                 }}
             >
-                {copied ? '✓ Ссылка скопирована!' : '🔗 Скопировать ссылку для друзей'}
-            </button>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <h3 style={{ fontSize: 15, color: '#cbd5e1' }}>Игроки в комнате ({playerList.length}):</h3>
-                <span style={{ fontSize: 12, color: '#64748b' }}>Вход открыт</span>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 20 }}>
-                {playerList.map((p, idx) => (
+                <div style={{ textAlign: 'center', marginBottom: 16 }}>
+                    <span style={{ fontSize: 12, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1 }}>
+                        Код комнаты
+                    </span>
                     <div
-                        key={p.id}
                         style={{
-                            padding: '10px 12px',
-                            borderRadius: 8,
-                            background: '#1e293b',
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            border: '1px solid #334155'
+                            fontSize: 34,
+                            fontWeight: 900,
+                            color: '#38bdf8',
+                            letterSpacing: 4,
+                            marginTop: 2
                         }}
                     >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <span style={{ color: '#64748b', fontSize: 13 }}>#{idx + 1}</span>
-                            <span style={{ fontWeight: 600 }}>
-                                {p.name} {p.id === myId ? '(Вы)' : ''}
-                            </span>
-                            {p.isHost && (
-                                <span
-                                    style={{
-                                        color: '#f59e0b',
-                                        fontSize: 10,
-                                        fontWeight: 'bold',
-                                        background: 'rgba(245, 158, 11, 0.15)',
-                                        padding: '2px 6px',
-                                        borderRadius: 4
-                                    }}
-                                >
-                                    ХОСТ
-                                </span>
-                            )}
-                        </div>
-                        <div style={{ fontWeight: 'bold', color: '#38bdf8', fontSize: 14 }}>
-                            {p.score || 0}{' '}
-                            <span style={{ fontSize: 11, color: '#64748b' }}>
-                                {(p.score || 0) === 1 ? 'победа' : (p.score || 0) >= 2 && (p.score || 0) <= 4 ? 'победы' : 'побед'}
-                            </span>
-                        </div>
+                        {room.code}
                     </div>
-                ))}
-            </div>
+                </div>
 
-            {isHost ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    <div style={{ textAlign: 'left' }}>
-                        <label style={{ fontSize: 13, color: '#94a3b8', marginBottom: 6, display: 'block' }}>
-                            Размер поля для следующего раунда:
-                        </label>
+                {/* Выбор размера поля для создателя */}
+                {isHost && (
+                    <div style={{ marginBottom: 18 }}>
+                        <span style={{ fontSize: 12, color: '#94a3b8', display: 'block', marginBottom: 6 }}>
+                            Размер поля:
+                        </span>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
-                            {[
-                                { id: '4x4', label: '4×4' },
-                                { id: '5x5', label: '5×5' },
-                                { id: '6x6', label: '6×6' },
-                                { id: 'custom', label: 'Свой' }
-                            ].map((b) => (
+                            {[3, 4, 5, 6].map((size) => (
                                 <button
-                                    key={b.id}
+                                    key={size}
                                     type="button"
-                                    onClick={() => setMode(b.id as any)}
+                                    onClick={() => setGridSize(size)}
                                     style={{
-                                        padding: '8px 4px',
+                                        padding: '8px 0',
                                         borderRadius: 8,
-                                        border: mode === b.id ? '2px solid #38bdf8' : '1px solid #334155',
-                                        background: mode === b.id ? '#1e293b' : '#0f172a',
+                                        border: gridSize === size ? '2px solid #38bdf8' : '1px solid #334155',
+                                        background: gridSize === size ? '#0369a1' : '#0f172a',
                                         color: '#fff',
-                                        fontWeight: 'bold',
+                                        fontWeight: 700,
                                         fontSize: 13,
                                         cursor: 'pointer'
                                     }}
                                 >
-                                    {b.label}
+                                    {size}×{size}
                                 </button>
                             ))}
                         </div>
                     </div>
+                )}
 
-                    {mode === 'custom' && (
-                        <div
-                            style={{
-                                background: '#1e293b',
-                                padding: 12,
-                                borderRadius: 10,
-                                border: '1px solid #334155',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: 10
-                            }}
-                        >
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ fontSize: 13, color: '#cbd5e1' }}>Ширина (колонок):</span>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    <button
-                                        onClick={() => setCustomWidth(Math.max(3, customWidth - 1))}
-                                        style={{ width: 30, height: 30, borderRadius: 6, background: '#334155', color: '#fff', border: 'none', fontSize: 16, cursor: 'pointer' }}
-                                    >
-                                        -
-                                    </button>
-                                    <span style={{ fontSize: 16, fontWeight: 900, minWidth: 20, textAlign: 'center' }}>
-                                        {customWidth}
-                                    </span>
-                                    <button
-                                        onClick={() => setCustomWidth(Math.min(9, customWidth + 1))}
-                                        style={{ width: 30, height: 30, borderRadius: 6, background: '#334155', color: '#fff', border: 'none', fontSize: 16, cursor: 'pointer' }}
-                                    >
-                                        +
-                                    </button>
-                                </div>
+                {/* Список игроков */}
+                <div style={{ marginBottom: 20 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#94a3b8', marginBottom: 8 }}>
+                        <span>Игроки в комнате:</span>
+                        <span>{playersList.length} чел.</span>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {playersList.map((p) => (
+                            <div
+                                key={p.id}
+                                style={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    background: p.id === myId ? '#0f172a' : '#182234',
+                                    padding: '9px 12px',
+                                    borderRadius: 10,
+                                    border: '1px solid #334155'
+                                }}
+                            >
+                                <span style={{ fontWeight: 600, fontSize: 14 }}>
+                                    {p.name} {p.isHost ? '👑' : ''} {p.id === myId ? '(Вы)' : ''}
+                                </span>
+                                <span style={{ color: '#38bdf8', fontSize: 13, fontWeight: 700 }}>
+                                    {p.score || 0} побед
+                                </span>
                             </div>
+                        ))}
+                    </div>
+                </div>
 
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ fontSize: 13, color: '#cbd5e1' }}>Высота (строк):</span>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    <button
-                                        onClick={() => setCustomHeight(Math.max(3, customHeight - 1))}
-                                        style={{ width: 30, height: 30, borderRadius: 6, background: '#334155', color: '#fff', border: 'none', fontSize: 16, cursor: 'pointer' }}
-                                    >
-                                        -
-                                    </button>
-                                    <span style={{ fontSize: 16, fontWeight: 900, minWidth: 20, textAlign: 'center' }}>
-                                        {customHeight}
-                                    </span>
-                                    <button
-                                        onClick={() => setCustomHeight(Math.min(9, customHeight + 1))}
-                                        style={{ width: 30, height: 30, borderRadius: 6, background: '#334155', color: '#fff', border: 'none', fontSize: 16, cursor: 'pointer' }}
-                                    >
-                                        +
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
+                {/* Кнопка запуска */}
+                {isHost ? (
                     <button
-                        onClick={handleStart}
+                        type="button"
+                        onClick={() => {
+                            console.log('Клик по кнопке Начать игру');
+                            onStartGame(gridSize, gridSize);
+                        }}
                         style={{
                             width: '100%',
-                            padding: 15,
+                            padding: 14,
                             borderRadius: 12,
                             background: '#e11d48',
                             color: '#fff',
                             border: 'none',
-                            fontWeight: 'bold',
-                            fontSize: 17,
-                            cursor: 'pointer'
+                            fontWeight: 800,
+                            fontSize: 16,
+                            cursor: 'pointer',
+                            boxShadow: '0 4px 15px rgba(225, 29, 72, 0.4)'
                         }}
                     >
-                        Начать битву!
+                        🚀 Начать игру ({gridSize}×{gridSize})
                     </button>
-                </div>
-            ) : (
-                <p style={{ color: '#94a3b8', fontStyle: 'italic', fontSize: 14, marginTop: 12 }}>
-                    Ждем, пока создатель настроит раунд и запустит игру...
-                </p>
-            )}
+                ) : (
+                    <div
+                        style={{
+                            textAlign: 'center',
+                            color: '#94a3b8',
+                            fontStyle: 'italic',
+                            fontSize: 13,
+                            padding: 8
+                        }}
+                    >
+                        ⏳ Ожидаем, пока создатель запустит игру...
+                    </div>
+                )}
+            </div>
         </div>
     );
 };
