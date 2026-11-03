@@ -1,4 +1,6 @@
 import { io } from 'socket.io-client';
 
-// В облаке сокет цепляется к текущему адресу сайта
-export const socket = io();
+export const socket = io(window.location.origin, {
+    transports: ['websocket'], // Запрещаем долгий polling, сразу открываем чистый WebSocket
+    upgrade: false
+});
