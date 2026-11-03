@@ -312,6 +312,161 @@ class SoundFX {
 
 const sfx = new SoundFX();
 
+// Фоновый холст Canvas с летающими фигурами (60 FPS)
+const SpaceCanvasBackground: React.FC = () => {
+    const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        let animId: number;
+        let width = (canvas.width = window.innerWidth);
+        let height = (canvas.height = window.innerHeight);
+
+        const handleResize = () => {
+            if (!canvas) return;
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        };
+        window.addEventListener('resize', handleResize);
+
+        const BG_SHAPES = [
+            { matrix: [[1, 1], [1, 1]], color: '#38bdf8' },
+            { matrix: [[1, 1, 1, 1]], color: '#ec4899' },
+            { matrix: [[1, 1, 1], [0, 1, 0]], color: '#a855f7' },
+            { matrix: [[1, 1, 0], [0, 1, 1]], color: '#10b981' },
+            { matrix: [[0, 1], [0, 1], [1, 1]], color: '#f59e0b' },
+            { matrix: [[0, 1, 0], [1, 1, 1], [0, 1, 0]], color: '#06b6d4' },
+            { matrix: [[1, 1, 1], [1, 0, 0]], color: '#ef4444' }
+        ];
+
+        // 12 фигур для игрового экрана (прозрачность 0.25–0.40, чтобы не отвлекать от сборки)
+        const items = Array.from({ length: 12 }, (_, i) => {
+            const shape = BG_SHAPES[i % BG_SHAPES.length];
+            const cellSize = 20 + Math.floor(Math.random() * 8);
+            return {
+                shape,
+                cellSize,
+                x: Math.random() * width,
+                y: Math.random() * height,
+                speedY: 0.45 + Math.random() * 0.55,
+                speedX: (Math.random() - 0.5) * 0.25,
+                rot: Math.random() * Math.PI * 2,
+                rotSpeed: (Math.random() - 0.5) * 0.01,
+                opacity: 0.25 + Math.random() * 0.18
+            };
+        });
+
+        const drawRoundedRect = (x: number, y: number, s: number, r: number) => {
+            ctx.beginPath();
+            ctx.moveTo(x + r, y);
+            ctx.lineTo(x + s - r, y);
+            ctx.arcTo(x + s, y, x + s, y + s, r);
+            ctx.lineTo(x + s, y + s - r);
+            ctx.arcTo(x + s, y + s, x, y + s, r);
+            ctx.lineTo(x + r, y + s);
+            ctx.arcTo(x, y + s, x, y, r);
+            ctx.lineTo(x, y + r);
+            ctx.arcTo(x, y, x + s, y, r);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+        };
+
+        const render = () => {
+            ctx.clearRect(0, 0, width, height);
+
+            // Мягкие туманности
+            const grad1 = ctx.createRadialGradient(width * 0.2, height * 0.2, 10, width * 0.2, height * 0.2, 300);
+            grad1.addColorStop(0, 'rgba(56, 189, 248, 0.16)');
+            grad1.addColorStop(1, 'transparent');
+            ctx.fillStyle = grad1;
+            ctx.fillRect(0, 0, width, height);
+
+            const grad2 = ctx.createRadialGradient(width * 0.8, height * 0.8, 10, width * 0.8, height * 0.8, 320);
+            grad2.addColorStop(0, 'rgba(168, 85, 247, 0.14)');
+            grad2.addColorStop(1, 'transparent');
+            ctx.fillStyle = grad2;
+            ctx.fillRect(0, 0, width, height);
+
+            // Фигуры
+            items.forEach((item) => {
+                item.y -= item.speedY;
+                item.x += item.speedX;
+                item.rot += item.rotSpeed;
+
+                if (item.y < -120) {
+                    item.y = height + 100;
+                    item.x = Math.random() * width;
+                }
+                if (item.x < -80) item.x = width + 80;
+                if (item.x > width + 80) item.x = -80;
+
+                const { matrix, color } = item.shape;
+                const s = item.cellSize;
+                const gap = 3;
+                const rows = matrix.length;
+                const cols = matrix[0].length;
+                const totalW = cols * s + (cols - 1) * gap;
+                const totalH = rows * s + (rows - 1) * gap;
+
+                ctx.save();
+                ctx.translate(item.x, item.y);
+                ctx.rotate(item.rot);
+                ctx.globalAlpha = item.opacity;
+
+                ctx.shadowColor = color;
+                ctx.shadowBlur = 10;
+                ctx.fillStyle = color;
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+                ctx.lineWidth = 1.2;
+
+                const startX = -totalW / 2;
+                const startY = -totalH / 2;
+
+                for (let r = 0; r < rows; r++) {
+                    for (let c = 0; c < cols; c++) {
+                        if (matrix[r][c] === 1) {
+                            const cellX = startX + c * (s + gap);
+                            const cellY = startY + r * (s + gap);
+                            drawRoundedRect(cellX, cellY, s, 4);
+                        }
+                    }
+                }
+
+                ctx.restore();
+            });
+
+            animId = requestAnimationFrame(render);
+        };
+
+        render();
+
+        return () => {
+            cancelAnimationFrame(animId);
+            window.removeEventListener('resize', handleResize);
+        };
+    }, []);
+
+    return (
+        <canvas
+            ref={canvasRef}
+            style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%',
+                pointerEvents: 'none',
+                zIndex: 1
+            }}
+        />
+    );
+};
+
 export const GameScreen: React.FC<GameScreenProps> = ({
     level,
     roomCode,
@@ -795,6 +950,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                 if (paintSplats.length > 0) wipePaintAt(e.clientX, e.clientY);
             }}
             style={{
+                position: 'relative',
                 paddingTop: 8,
                 paddingLeft: 12,
                 paddingRight: 12,
@@ -809,7 +965,8 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                 WebkitUserSelect: 'none',
                 touchAction: 'none',
                 boxSizing: 'border-box',
-                overflow: 'hidden'
+                overflow: 'hidden',
+                background: 'radial-gradient(ellipse at 50% 25%, #1e1b4b 0%, #090d1a 60%, #030712 100%)'
             }}
         >
             <style>{`
@@ -831,7 +988,8 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                     100% { transform: translate(-50%, -50%) scale(2.4); opacity: 0; }
                 }
             `}</style>
-
+            {/* 0. Космический Canvas-фон с фигурами */}
+            <SpaceCanvasBackground />
             {/* 1. Верхняя панель (zIndex выше фонарика, чтобы кнопки всегда нажимались) */}
             <div style={{ width: '100%', maxWidth: 440, flex: '0 0 auto', position: 'relative', zIndex: 7500 }}>
                 <div
@@ -1025,7 +1183,10 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                     gridTemplateColumns: `repeat(${level.gridWidth}, ${CELL_SIZE}px)`,
                     gridTemplateRows: `repeat(${level.gridHeight}, ${CELL_SIZE}px)`,
                     gap: `${CELL_GAP}px`,
-                    background: '#1e293b',
+                    zIndex: 2,
+                    background: 'rgba(30, 41, 59, 0.82)',
+                    backdropFilter: 'blur(12px)',
+                    WebkitBackdropFilter: 'blur(12px)',
                     padding: 10,
                     borderRadius: 14,
                     border: isSwappingBoard ? '2px solid #10b981' : '2px solid #334155',
@@ -1119,7 +1280,11 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                     alignContent: 'flex-start',
                     gap: 8,
                     padding: '10px 8px',
-                    background: '#0b1329',
+                    position: 'relative',
+                    zIndex: 2,
+                    background: 'rgba(11, 19, 41, 0.78)',
+                    backdropFilter: 'blur(14px)',
+                    WebkitBackdropFilter: 'blur(14px)',
                     borderRadius: 14,
                     border: '1px solid #1e293b',
                     boxShadow: '0 -4px 20px rgba(0, 0, 0, 0.3)',
