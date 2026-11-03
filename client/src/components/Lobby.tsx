@@ -22,29 +22,29 @@ interface LobbyProps {
 
 // Формы фигур для фона
 const BG_SHAPES = [
-    { matrix: [[1, 1], [1, 1]], color: '#38bdf8' },               // O (голубой)
+    { matrix: [[1, 1], [1, 1]], color: '#38bdf8' },               // O (лазурный)
     { matrix: [[1, 1, 1, 1]], color: '#ec4899' },                 // I (розовый)
     { matrix: [[1, 1, 1], [0, 1, 0]], color: '#a855f7' },         // T (фиолетовый)
     { matrix: [[1, 1, 0], [0, 1, 1]], color: '#10b981' },         // Z (изумрудный)
     { matrix: [[0, 1], [0, 1], [1, 1]], color: '#f59e0b' },         // L (янтарный)
-    { matrix: [[0, 1, 0], [1, 1, 1], [0, 1, 0]], color: '#06b6d4' }, // Клик / Плюс
+    { matrix: [[0, 1, 0], [1, 1, 1], [0, 1, 0]], color: '#06b6d4' }, // Плюс / Крест
     { matrix: [[1, 1, 1], [1, 0, 0]], color: '#ef4444' }          // J (коралловый)
 ];
 
-// Конфигурация фигур с индивидуальным горизонтальным дрейфом (sway)
+// 12 фигур: непрерывное плавное движение по всему экрану
 const FLOATING_ITEMS = [
-    { shapeIdx: 0, left: 5, size: 32, dur: 22, delay: -3, rot: 180, sway: 25, opacity: 0.55 },
-    { shapeIdx: 1, left: 16, size: 28, dur: 26, delay: -15, rot: 360, sway: -28, opacity: 0.50 },
-    { shapeIdx: 2, left: 28, size: 30, dur: 20, delay: -8, rot: -240, sway: 32, opacity: 0.58 },
-    { shapeIdx: 3, left: 42, size: 26, dur: 24, delay: -18, rot: 270, sway: -22, opacity: 0.48 },
-    { shapeIdx: 4, left: 53, size: 34, dur: 23, delay: -5, rot: -180, sway: 30, opacity: 0.52 },
-    { shapeIdx: 5, left: 64, size: 28, dur: 28, delay: -12, rot: 360, sway: -35, opacity: 0.50 },
-    { shapeIdx: 6, left: 74, size: 32, dur: 21, delay: -2, rot: -300, sway: 26, opacity: 0.56 },
-    { shapeIdx: 1, left: 84, size: 30, dur: 27, delay: -16, rot: 240, sway: -30, opacity: 0.52 },
-    { shapeIdx: 0, left: 93, size: 34, dur: 19, delay: -9, rot: -270, sway: 22, opacity: 0.58 },
-    { shapeIdx: 2, left: 10, size: 28, dur: 25, delay: -21, rot: 180, sway: -26, opacity: 0.48 },
-    { shapeIdx: 4, left: 47, size: 30, dur: 22, delay: -14, rot: 320, sway: 34, opacity: 0.50 },
-    { shapeIdx: 3, left: 88, size: 32, dur: 24, delay: -6, rot: -190, sway: -20, opacity: 0.54 }
+    { shapeIdx: 0, left: 4, size: 32, dur: 20, delay: -3, rot: 180, sway: 35, opacity: 0.65 },
+    { shapeIdx: 1, left: 16, size: 28, dur: 24, delay: -15, rot: 360, sway: -30, opacity: 0.60 },
+    { shapeIdx: 2, left: 28, size: 30, dur: 19, delay: -8, rot: -240, sway: 40, opacity: 0.68 },
+    { shapeIdx: 3, left: 42, size: 26, dur: 23, delay: -18, rot: 270, sway: -25, opacity: 0.58 },
+    { shapeIdx: 4, left: 54, size: 34, dur: 21, delay: -5, rot: -180, sway: 30, opacity: 0.62 },
+    { shapeIdx: 5, left: 66, size: 28, dur: 26, delay: -12, rot: 360, sway: -35, opacity: 0.60 },
+    { shapeIdx: 6, left: 76, size: 32, dur: 20, delay: -2, rot: -300, sway: 25, opacity: 0.66 },
+    { shapeIdx: 1, left: 86, size: 30, dur: 25, delay: -16, rot: 240, sway: -30, opacity: 0.62 },
+    { shapeIdx: 0, left: 93, size: 34, dur: 18, delay: -9, rot: -270, sway: 20, opacity: 0.70 },
+    { shapeIdx: 2, left: 10, size: 28, dur: 23, delay: -21, rot: 180, sway: -32, opacity: 0.58 },
+    { shapeIdx: 4, left: 48, size: 30, dur: 21, delay: -14, rot: 320, sway: 35, opacity: 0.60 },
+    { shapeIdx: 3, left: 88, size: 32, dur: 22, delay: -6, rot: -190, sway: -22, opacity: 0.64 }
 ];
 
 export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
@@ -114,22 +114,13 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
             }}
         >
             <style>{`
-        /* 100% GPU-ускоренная траектория: вертикальный взлет + синусоидальное покачивание */
-        @keyframes fullScreenSwayFloat {
+        /* Непрерывный равномерный полёт снизу до самого верха БЕЗ остановок */
+        @keyframes smoothLinearFloat {
           0% {
             transform: translate3d(0, 108vh, 0) rotate(0deg);
           }
-          25% {
-            transform: translate3d(var(--item-sway, 25px), 76vh, 0) rotate(calc(var(--item-rot, 360deg) * 0.25));
-          }
-          50% {
-            transform: translate3d(calc(var(--item-sway, 25px) * -1), 44vh, 0) rotate(calc(var(--item-rot, 360deg) * 0.5));
-          }
-          75% {
-            transform: translate3d(calc(var(--item-sway, 25px) * 0.75), 12vh, 0) rotate(calc(var(--item-rot, 360deg) * 0.75));
-          }
           100% {
-            transform: translate3d(0, -25vh, 0) rotate(var(--item-rot, 360deg));
+            transform: translate3d(var(--item-sway, 25px), -28vh, 0) rotate(var(--item-rot, 360deg));
           }
         }
 
@@ -150,7 +141,7 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
         }
       `}</style>
 
-            {/* 1. Объемное статичное неоновое свечение (нагрузка 0%) */}
+            {/* 1. Атмосферное фоновое свечение космоса */}
             <div
                 style={{
                     position: 'fixed',
@@ -180,7 +171,7 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                 }}
             />
 
-            {/* 2. Летающие фигуры с плавным боковым дрейфом */}
+            {/* 2. Яркие летающие фигуры со свечением */}
             <div
                 style={{
                     position: 'fixed',
@@ -207,11 +198,12 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                                 // @ts-ignore
                                 '--item-rot': `${item.rot}deg`,
                                 '--item-sway': `${item.sway}px`,
-                                animation: `fullScreenSwayFloat ${item.dur}s ease-in-out infinite`,
+                                animation: `smoothLinearFloat ${item.dur}s linear infinite`,
                                 animationDelay: `${item.delay}s`,
                                 display: 'grid',
                                 gridTemplateColumns: `repeat(${shape.matrix[0].length}, ${cellSize}px)`,
-                                gap: `${gap}px`
+                                gap: `${gap}px`,
+                                filter: `drop-shadow(0 0 16px ${shape.color})`
                             }}
                         >
                             {shape.matrix.map((row, r) =>
@@ -221,12 +213,12 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                                         style={{
                                             width: cellSize,
                                             height: cellSize,
-                                            borderRadius: 6,
+                                            borderRadius: 7,
                                             background: val ? shape.color : 'transparent',
                                             boxShadow: val
-                                                ? `0 0 10px ${shape.color}88, inset 0 0 6px rgba(255,255,255,0.4)`
+                                                ? `0 0 14px ${shape.color}, inset 0 0 6px rgba(255, 255, 255, 0.65)`
                                                 : 'none',
-                                            border: val ? '1px solid rgba(255,255,255,0.25)' : 'none'
+                                            border: val ? '1.5px solid rgba(255, 255, 255, 0.35)' : 'none'
                                         }}
                                     />
                                 ))
