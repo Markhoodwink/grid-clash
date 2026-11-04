@@ -735,14 +735,14 @@ export const GameScreen: React.FC<GameScreenProps> = ({
     }, [myId, players]);
 
     const spawnPaintSplats = () => {
-        const count = 5;
+        const count = 3; // 3 крупные кляксы вместо 5 мелких
         const w = window.innerWidth;
         const h = window.innerHeight;
         const newSplats: PaintSplat[] = Array.from({ length: count }, (_, i) => ({
             id: Date.now() + i,
-            x: w * 0.18 + Math.random() * (w * 0.64),
-            y: h * 0.22 + Math.random() * (h * 0.45),
-            size: 115 + Math.floor(Math.random() * 40),
+            x: w * 0.22 + Math.random() * (w * 0.56),
+            y: h * 0.28 + Math.random() * (h * 0.38),
+            size: 140 + Math.floor(Math.random() * 35),
             color: SPLAT_COLORS[i % SPLAT_COLORS.length],
             hp: 100
         }));
@@ -823,9 +823,10 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 
         if (!last) return;
         const moveStep = Math.hypot(clientX - last.x, clientY - last.y);
-        if (moveStep < 3) return;
+        // Срабатываем раз в 10px движения — убирает спам ре-рендеров на 120Hz экранах
+        if (moveStep < 10) return;
 
-        const scrubDamage = Math.min(6.5, moveStep * 0.25);
+        const scrubDamage = Math.min(14, moveStep * 0.45);
         let hitAny = false;
 
         setPaintSplats((prev) =>
@@ -1509,23 +1510,23 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                                         ? isGhostValid
                                             ? ghostColor
                                             : '#ef4444'
-                                        : cell.color || 'rgba(15, 23, 42, 0.55)',
+                                        : isGhostMode && cell.color
+                                            ? 'rgba(15, 23, 42, 0.55)' // Во время призраков сливается с фоном пустых клеток!
+                                            : cell.color || 'rgba(15, 23, 42, 0.55)',
                                     opacity: isGhostCell
                                         ? isGhostValid
                                             ? 0.45
                                             : 0.65
-                                        : cell.color && isGhostMode
-                                            ? 0.07
-                                            : 1,
+                                        : 1,
                                     border: isGhostCell
                                         ? isGhostValid
                                             ? `2px solid ${ghostColor}`
                                             : '2px solid #ef4444'
-                                        : cell.color
-                                            ? isGhostMode
-                                                ? '1px dashed rgba(226, 232, 240, 0.4)'
-                                                : 'none'
-                                            : '1px dashed #334155',
+                                        : isGhostMode
+                                            ? '1px dashed #334155' // Маскируется под серый пунктир пустых клеток!
+                                            : cell.color
+                                                ? 'none'
+                                                : '1px dashed #334155',
                                     cursor: cell.shape ? 'grab' : 'default',
                                     transition: 'background 0.05s ease, opacity 0.25s ease'
                                 }}
@@ -1814,14 +1815,33 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                                 top: splat.y,
                                 width: splat.size,
                                 height: splat.size,
-                                transform: `translate(-50%, -50%) scale(${0.45 + (splat.hp / 100) * 0.65})`,
-                                background: splat.color,
-                                opacity: Math.max(0.35, splat.hp / 100),
-                                borderRadius: '44% 56% 62% 38% / 53% 42% 58% 47%',
-                                boxShadow: `0 0 28px ${splat.color}, inset 0 0 18px rgba(0,0,0,0.35)`,
-                                pointerEvents: 'none'
+                                transform: `translate(-50%, -50%) scale(${0.35 + (splat.hp / 100) * 0.65})`,
+                                opacity: Math.max(0.4, splat.hp / 100),
+                                pointerEvents: 'none',
+                                filter: 'drop-shadow(0 6px 14px rgba(0,0,0,0.5))',
+                                transition: 'transform 0.08s ease-out, opacity 0.08s ease-out'
                             }}
-                        />
+                        >
+                            <svg viewBox="0 0 100 100" width="100%" height="100%">
+                                {/* Центральная сочная клякса */}
+                                <path
+                                    d="M 50,15 C 68,12 85,28 82,46 C 88,62 76,82 58,84 C 42,86 26,78 18,65 C 10,48 18,28 32,20 C 38,16 44,18 50,15 Z"
+                                    fill={splat.color}
+                                />
+                                {/* Брызги-капли вокруг */}
+                                <circle cx="86" cy="24" r="5" fill={splat.color} />
+                                <circle cx="16" cy="26" r="4.5" fill={splat.color} />
+                                <circle cx="14" cy="74" r="6" fill={splat.color} />
+                                <circle cx="78" cy="78" r="5.5" fill={splat.color} />
+                                <circle cx="52" cy="92" r="4" fill={splat.color} />
+                                <circle cx="48" cy="8" r="3.5" fill={splat.color} />
+                                {/* Глянцевый блик света */}
+                                <path
+                                    d="M 34,28 C 42,24 54,24 62,30 C 58,35 46,33 36,36 Z"
+                                    fill="rgba(255, 255, 255, 0.42)"
+                                />
+                            </svg>
+                        </div>
                     ))}
                 </div>
             )}
