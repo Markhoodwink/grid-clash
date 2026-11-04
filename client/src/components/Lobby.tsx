@@ -693,10 +693,10 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                             background: 'rgba(15, 23, 42, 0.96)',
                             border: '1px solid rgba(56, 189, 248, 0.35)',
                             borderRadius: 22,
-                            padding: '20px 18px',
-                            maxWidth: 420,
+                            padding: '22px 24px',
+                            maxWidth: 700, // Было 420 — теперь на ПК окно просторное и удобное!
                             width: '100%',
-                            maxHeight: '84vh',
+                            maxHeight: '86vh',
                             display: 'flex',
                             flexDirection: 'column',
                             boxShadow: '0 25px 60px rgba(0, 0, 0, 0.7), 0 0 35px rgba(56, 189, 248, 0.2)',
@@ -704,10 +704,10 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                         }}
                     >
                         {/* Заголовок модалки */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <span style={{ fontSize: 22 }}>📖</span>
-                                <h2 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: '#f8fafc' }}>
+                                <span style={{ fontSize: 24 }}>📖</span>
+                                <h2 style={{ margin: 0, fontSize: 20, fontWeight: 900, color: '#f8fafc' }}>
                                     Гайд по игре
                                 </h2>
                             </div>
@@ -718,8 +718,8 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                                     background: 'rgba(51, 65, 85, 0.6)',
                                     border: 'none',
                                     color: '#94a3b8',
-                                    width: 28,
-                                    height: 28,
+                                    width: 30,
+                                    height: 30,
                                     borderRadius: '50%',
                                     fontSize: 16,
                                     fontWeight: 700,
@@ -737,59 +737,60 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                         <div
                             style={{
                                 overflowY: 'auto',
-                                paddingRight: 4,
+                                paddingRight: 6,
                                 display: 'flex',
                                 flexDirection: 'column',
-                                gap: 14,
+                                gap: 12,
                                 fontSize: 13,
                                 color: '#cbd5e1',
-                                lineHeight: 1.45
+                                lineHeight: 1.5
                             }}
                         >
-                            {/* Суть игры */}
-                            <div style={{ background: 'rgba(2, 6, 23, 0.6)', padding: 12, borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)' }}>
-                                <div style={{ fontWeight: 800, color: '#38bdf8', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
-                                    <span>🧩</span> Суть игры
+                            {/* Верхние блоки: Суть и Управление (на ПК встают рядом в 2 колонки) */}
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 10 }}>
+                                <div style={{ background: 'rgba(2, 6, 23, 0.6)', padding: 14, borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)' }}>
+                                    <div style={{ fontWeight: 800, color: '#38bdf8', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6, fontSize: 14 }}>
+                                        <span>🧩</span> Суть игры
+                                    </div>
+                                    Заполните поле фигурами быстрее соперников на 100%. Фигуры не должны накладываться друг на друга или выходить за границы доски.
                                 </div>
-                                Заполните поле фигурами быстрее соперников на 100%. Фигуры не должны накладываться друг на друга или выходить за границы доски.
+
+                                <div style={{ background: 'rgba(2, 6, 23, 0.6)', padding: 14, borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)' }}>
+                                    <div style={{ fontWeight: 800, color: '#f59e0b', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6, fontSize: 14 }}>
+                                        <span>🎮</span> Управление
+                                    </div>
+                                    <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                        <li><b>Зажать и тянуть:</b> перетаскивание фигуры на поле.</li>
+                                        <li><b>↻ Повернуть:</b> вращение фигуры по часовой стрелке.</li>
+                                        <li><b>Снять фигуру:</b> потяните установленную деталь вниз в лоток.</li>
+                                    </ul>
+                                </div>
                             </div>
 
-                            {/* Управление */}
-                            <div style={{ background: 'rgba(2, 6, 23, 0.6)', padding: 12, borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)' }}>
-                                <div style={{ fontWeight: 800, color: '#f59e0b', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-                                    <span>🎮</span> Управление
-                                </div>
-                                <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                    <li><b>Зажать и тянуть:</b> перетаскивание фигуры из лотка на поле.</li>
-                                    <li><b>↻ Повернуть:</b> кнопка под каждой фигурой вращает её по часовой стрелке.</li>
-                                    <li><b>Снять фигуру:</b> потяните установленную деталь с доски вниз в лоток.</li>
-                                </ul>
-                            </div>
-
-                            {/* Хаос-ивенты */}
-                            <div style={{ background: 'rgba(2, 6, 23, 0.6)', padding: 12, borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)' }}>
-                                <div style={{ fontWeight: 800, color: '#ec4899', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                            {/* Хаос-ивенты (на ПК автоматически выстраиваются в 2 колонки) */}
+                            <div style={{ background: 'rgba(2, 6, 23, 0.6)', padding: 14, borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)' }}>
+                                <div style={{ fontWeight: 800, color: '#ec4899', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6, fontSize: 14 }}>
                                     <span>🌪️</span> Хаос-ивенты (каждые 10с)
                                 </div>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12 }}>
-                                    <div>🎨 <b>Кляксы:</b> плотные стойкие пятна — трите их быстрыми свайпами пальца.</div>
-                                    <div>🎠 <b>Мегакарусель:</b> доска дрейфует по орбите, а лоток сдвигает фигуры каждые 2.5с.</div>
-                                    <div>👀 <b>Призраки:</b> детали полностью невидимы и замаскированы под пустую сетку — собирайте по памяти!</div>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '8px 16px', fontSize: 12 }}>
+                                    <div>🎨 <b>Кляксы:</b> плотные пятна — трите быстрыми свайпами.</div>
+                                    <div>🎠 <b>Мегакарусель:</b> доска дрейфует, лоток сдвигается раз в 2.5с.</div>
+                                    <div>👀 <b>Призраки:</b> детали полностью невидимы — собирайте по памяти!</div>
                                     <div>🪞 <b>Зеркало X:</b> палец по горизонтали тянет фигуру в обратную сторону.</div>
-                                    <div>🌫️ <b>Туман войны:</b> фигуры в лотке скрыты под знаками «❓» до момента захвата.</div>
-                                    <div>🧊 <b>Заморозка:</b> стучите по льду (3 удара), чтобы разморозить деталь.</div>
-                                    <div>🔦 <b>Тьма:</b> поле скрыто мраком, палец подсвечивает область вокруг.</div>
+                                    <div>🌫️ <b>Туман войны:</b> фигуры в лотке спрятаны под «❓» до касания.</div>
+                                    <div>🧊 <b>Заморозка:</b> стучите по льду (3 удара), чтобы освободить деталь.</div>
+                                    <div>🔦 <b>Тьма:</b> поле скрыто тьмой, палец работает фонариком.</div>
                                     <div>🎭 <b>Хамелеон:</b> все детали на время окрашиваются в один цвет.</div>
-                                    <div>🌀 <b>Свап досок:</b> редкий супер-ивент — моментальный обмен полями с соперником!</div>
+                                    <div>🌀 <b>Свап досок:</b> редкий супер-ивент — моментальный обмен полями!</div>
                                 </div>
                             </div>
 
                             {/* Комбо */}
-                            <div style={{ background: 'rgba(2, 6, 23, 0.6)', padding: 12, borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)' }}>
-                                <div style={{ fontWeight: 800, color: '#f43f5e', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <div style={{ background: 'rgba(2, 6, 23, 0.6)', padding: 14, borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)' }}>
+                                <div style={{ fontWeight: 800, color: '#f43f5e', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6, fontSize: 14 }}>
                                     <span>⚡</span> Умные комбо (33% шанс)
                                 </div>
-                                Со 2-го цикла раунда игра может запустить 2 события одновременно (например, <i>Заморозка + Зеркало X</i> или <i>Карусель + Туман</i>).
+                                Со 2-го цикла раунда игра может запустить 2 события одновременно (например, <i>Заморозка + Зеркало X</i> или <i>Мегакарусель + Туман</i>).
                             </div>
                         </div>
 
@@ -799,14 +800,14 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                             className="primary-btn"
                             onClick={() => setShowGuide(false)}
                             style={{
-                                marginTop: 14,
-                                padding: 12,
+                                marginTop: 16,
+                                padding: 13,
                                 borderRadius: 12,
                                 background: 'linear-gradient(135deg, #0284c7 0%, #2563eb 100%)',
                                 color: '#fff',
                                 border: 'none',
                                 fontWeight: 800,
-                                fontSize: 14,
+                                fontSize: 15,
                                 cursor: 'pointer',
                                 boxShadow: '0 4px 16px rgba(2, 132, 199, 0.4)'
                             }}
