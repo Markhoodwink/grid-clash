@@ -877,26 +877,61 @@ export const GameScreen: React.FC<GameScreenProps> = ({
         setDragPos({ x: e.clientX, y: e.clientY });
     };
 
+    const getCarouselAngle = () => {
+        if (!hasEvent('CAROUSEL')) return 0;
+        // Первые 5 секунд — 90°, вторые 5 секунд — 180°
+        return eventCountdown > 5 ? 90 : 180;
+    };
+
     const getSnapTarget = () => {
         if (!draggedPiece || !dragPos || !boardRef.current) return null;
 
         const boardRect = boardRef.current.getBoundingClientRect();
         const padding = 10;
+        const angle = getCarouselAngle();
 
         const pieceTopLeftX = dragPos.x - grabOffset.x;
         const pieceTopLeftY = dragPos.y - grabOffset.y;
 
-        const relX = pieceTopLeftX - (boardRect.left + padding);
-        const relY = pieceTopLeftY - (boardRect.top + padding);
-
-        const rawCol = Math.round(relX / STEP);
-        const rawRow = Math.round(relY / STEP);
-
         const shapeRows = draggedPiece.matrix.length;
         const shapeCols = draggedPiece.matrix[0].length;
 
-        const col = hasEvent('CAROUSEL') ? level.gridWidth - shapeCols - rawCol : rawCol;
-        const row = hasEvent('CAROUSEL') ? level.gridHeight - shapeRows - rawRow : rawRow;
+        let col = 0;
+        let row = 0;
+
+        if (angle === 90) {
+            // Центр поля
+            const cx = boardRect.left + boardRect.width / 2;
+            const cy = boardRect.top + boardRect.height / 2;
+
+            // Разворачиваем координаты курсора обратно на -90°
+            const dx = pieceTopLeftX - cx;
+            const dy = pieceTopLeftY - cy;
+            const unrotX = cx + dy;
+            const unrotY = cy - dx;
+
+            const boardW = level.gridWidth * STEP;
+            const boardH = level.gridHeight * STEP;
+
+            const relX = unrotX - (cx - boardW / 2 + padding);
+            const relY = unrotY - (cy - boardH / 2 + padding);
+
+            col = Math.round(relX / STEP);
+            row = Math.round(relY / STEP);
+        } else if (angle === 180) {
+            const relX = pieceTopLeftX - (boardRect.left + padding);
+            const relY = pieceTopLeftY - (boardRect.top + padding);
+            const rawCol = Math.round(relX / STEP);
+            const rawRow = Math.round(relY / STEP);
+
+            col = level.gridWidth - shapeCols - rawCol;
+            row = level.gridHeight - shapeRows - rawRow;
+        } else {
+            const relX = pieceTopLeftX - (boardRect.left + padding);
+            const relY = pieceTopLeftY - (boardRect.top + padding);
+            col = Math.round(relX / STEP);
+            row = Math.round(relY / STEP);
+        }
 
         const inBounds =
             row >= 0 &&
@@ -1411,13 +1446,13 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                         : '0 8px 24px rgba(0,0,0,0.4)',
                     margin: 'auto 0',
                     flex: '0 0 auto',
-                    transform: hasEvent('CAROUSEL') ? 'rotate(180deg)' : 'none',
+                    transform: `rotate(${getCarouselAngle()}deg)`,
                     animation: isSwappingBoard
                         ? 'swapBoard3D 0.9s cubic-bezier(0.22, 1, 0.36, 1)'
                         : hasEvent('EARTHQUAKE')
                             ? 'chaosShake 0.25s infinite'
                             : 'none',
-                    transition: 'transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1)'
+                    transition: 'transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)'
                 }}
             >
                 {boardCells.map((row, r) =>
@@ -1785,7 +1820,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                         display: 'grid',
                         gridTemplateColumns: `repeat(${draggedPiece.matrix[0].length}, ${CELL_SIZE}px)`,
                         gap: `${CELL_GAP}px`,
-                        transform: hasEvent('CAROUSEL') ? 'rotate(180deg)' : 'none',
+                        transform: 'none',
                         filter: 'drop-shadow(0 12px 24px rgba(0,0,0,0.6))'
                     }}
                 >
