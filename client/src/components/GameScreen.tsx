@@ -103,17 +103,32 @@ class SoundFX {
         const ctx = this.getContext();
         if (!ctx) return;
         const now = ctx.currentTime;
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(190, now);
-        osc.frequency.exponentialRampToValueAtTime(520, now + 0.085);
-        gain.gain.setValueAtTime(0.28, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(now);
-        osc.stop(now + 0.09);
+
+        // 1. Механический глухой щелчок (удар плитки)
+        const thudOsc = ctx.createOscillator();
+        const thudGain = ctx.createGain();
+        thudOsc.type = 'triangle';
+        thudOsc.frequency.setValueAtTime(140, now);
+        thudOsc.frequency.exponentialRampToValueAtTime(35, now + 0.05);
+        thudGain.gain.setValueAtTime(0.42, now);
+        thudGain.gain.exponentialRampToValueAtTime(0.001, now + 0.055);
+        thudOsc.connect(thudGain);
+        thudGain.connect(ctx.destination);
+        thudOsc.start(now);
+        thudOsc.stop(now + 0.055);
+
+        // 2. Звонкая фиксация замка
+        const clickOsc = ctx.createOscillator();
+        const clickGain = ctx.createGain();
+        clickOsc.type = 'sine';
+        clickOsc.frequency.setValueAtTime(380, now);
+        clickOsc.frequency.exponentialRampToValueAtTime(720, now + 0.06);
+        clickGain.gain.setValueAtTime(0.24, now);
+        clickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.065);
+        clickOsc.connect(clickGain);
+        clickGain.connect(ctx.destination);
+        clickOsc.start(now);
+        clickOsc.stop(now + 0.065);
     }
 
     playReturn() {
@@ -1027,7 +1042,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 
             if (snap && snap.isValid) {
                 sfx.playSnap();
-                if ('vibrate' in navigator) navigator.vibrate(25);
+                if ('vibrate' in navigator) navigator.vibrate([38, 20, 25]);
 
                 const updated = currentPieces.map((p) =>
                     p.id === piece.id ? { ...p, row: snap.row, col: snap.col } : p
