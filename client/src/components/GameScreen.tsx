@@ -823,10 +823,10 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 
         if (!last) return;
         const moveStep = Math.hypot(clientX - last.x, clientY - last.y);
-        // Срабатываем раз в 10px движения — убирает спам ре-рендеров на 120Hz экранах
         if (moveStep < 10) return;
 
-        const scrubDamage = Math.min(14, moveStep * 0.45);
+        // Урон снижен в 1.5 раза — кляксы держатся ощутимо дольше
+        const scrubDamage = Math.min(9.3, moveStep * 0.3);
         let hitAny = false;
 
         setPaintSplats((prev) =>
