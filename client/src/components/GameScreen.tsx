@@ -59,7 +59,7 @@ interface GameScreenProps {
 const EVENT_INFO: Record<ChaosEvent, { title: string; short: string; color: string }> = {
     NONE: { title: '⏳ Приготовьтесь...', short: '⏳ Спокойствие', color: '#38bdf8' },
     PAINT: { title: '🎨 КРАСКА! Быстро три кляксы пальцем!', short: '🎨 Кляксы', color: '#ec4899' },
-    CAROUSEL: { title: '🎠 КАРУСЕЛЬ! Поле вверх ногами (180°)!', short: '🎠 Карусель 180°', color: '#f59e0b' },
+    CAROUSEL: { title: '🎠 МЕГАКАРУСЕЛЬ! Поле дрейфует, лоток движется!', short: '🎠 Мегакарусель', color: '#f59e0b' },
     MONOCHROME: { title: '🎭 ХАМЕЛЕОН! Все фигуры одного цвета!', short: '🎭 Хамелеон', color: '#a855f7' },
     EARTHQUAKE: { title: '🌋 ЗЕМЛЕТРЯСЕНИЕ! Держи экран!', short: '🌋 Землетрясение', color: '#ef4444' },
     FLASHLIGHT: { title: '🔦 ТЬМА! Подсвечивай поле пальцем!', short: '🔦 Тьма', color: '#eab308' },
@@ -607,6 +607,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [playerReactions, setPlayerReactions] = useState<Record<string, { emoji: string; ts: number }>>({});
     const [recentReaction, setRecentReaction] = useState<{ emoji: string; name: string } | null>(null);
+    const [trayShift, setTrayShift] = useState<number>(0);
 
     const dragStartPointerRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
     const dragStartPiecePosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -799,6 +800,21 @@ export const GameScreen: React.FC<GameScreenProps> = ({
         return () => clearInterval(timer);
     }, [roundResults, isHost, roomCode, players]);
 
+    // Сдвиг конвейера лотка каждые 2.5 сек во время Мегакарусели
+    useEffect(() => {
+        if (!hasEvent('CAROUSEL') || roundResults) {
+            setTrayShift(0);
+            return;
+        }
+
+        const interval = setInterval(() => {
+            setTrayShift((prev) => prev + 1);
+            sfx.playRotate();
+        }, 2500);
+
+        return () => clearInterval(interval);
+    }, [activeEvents, roundResults]);
+
     const wipePaintAt = (clientX: number, clientY: number) => {
         if (paintSplats.length === 0) return;
 
@@ -900,61 +916,24 @@ export const GameScreen: React.FC<GameScreenProps> = ({
         setDragPos({ x: e.clientX, y: e.clientY });
     };
 
-    const getCarouselAngle = () => {
-        if (!hasEvent('CAROUSEL')) return 0;
-        // Первые 5 секунд — 90°, вторые 5 секунд — 180°
-        return eventCountdown > 5 ? 90 : 180;
-    };
-
     const getSnapTarget = () => {
         if (!draggedPiece || !dragPos || !boardRef.current) return null;
 
         const boardRect = boardRef.current.getBoundingClientRect();
         const padding = 10;
-        const angle = getCarouselAngle();
 
         const pieceTopLeftX = dragPos.x - grabOffset.x;
         const pieceTopLeftY = dragPos.y - grabOffset.y;
 
+        // Позиция относительно текущего положения плывущего поля
+        const relX = pieceTopLeftX - (boardRect.left + padding);
+        const relY = pieceTopLeftY - (boardRect.top + padding);
+
+        const col = Math.round(relX / STEP);
+        const row = Math.round(relY / STEP);
+
         const shapeRows = draggedPiece.matrix.length;
         const shapeCols = draggedPiece.matrix[0].length;
-
-        let col = 0;
-        let row = 0;
-
-        if (angle === 90) {
-            // Центр поля
-            const cx = boardRect.left + boardRect.width / 2;
-            const cy = boardRect.top + boardRect.height / 2;
-
-            // Разворачиваем координаты курсора обратно на -90°
-            const dx = pieceTopLeftX - cx;
-            const dy = pieceTopLeftY - cy;
-            const unrotX = cx + dy;
-            const unrotY = cy - dx;
-
-            const boardW = level.gridWidth * STEP;
-            const boardH = level.gridHeight * STEP;
-
-            const relX = unrotX - (cx - boardW / 2 + padding);
-            const relY = unrotY - (cy - boardH / 2 + padding);
-
-            col = Math.round(relX / STEP);
-            row = Math.round(relY / STEP);
-        } else if (angle === 180) {
-            const relX = pieceTopLeftX - (boardRect.left + padding);
-            const relY = pieceTopLeftY - (boardRect.top + padding);
-            const rawCol = Math.round(relX / STEP);
-            const rawRow = Math.round(relY / STEP);
-
-            col = level.gridWidth - shapeCols - rawCol;
-            row = level.gridHeight - shapeRows - rawRow;
-        } else {
-            const relX = pieceTopLeftX - (boardRect.left + padding);
-            const relY = pieceTopLeftY - (boardRect.top + padding);
-            col = Math.round(relX / STEP);
-            row = Math.round(relY / STEP);
-        }
 
         const inBounds =
             row >= 0 &&
@@ -1099,7 +1078,10 @@ export const GameScreen: React.FC<GameScreenProps> = ({
         }
     });
 
-    const trayPieces = pieces.filter((p) => p.row === null);
+    const rawTrayPieces = pieces.filter((p) => p.row === null);
+    const trayPieces = hasEvent('CAROUSEL') && rawTrayPieces.length > 1
+        ? [...rawTrayPieces.slice(trayShift % rawTrayPieces.length), ...rawTrayPieces.slice(0, trayShift % rawTrayPieces.length)]
+        : rawTrayPieces;
     const hasVotedEndRound = endRoundVotes.includes(myId);
 
     const bannerTitle =
@@ -1149,6 +1131,17 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                     60% { transform: translate(-5px, -3px) rotate(-1deg); }
                     80% { transform: translate(5px, 5px) rotate(1deg); }
                     100% { transform: translate(0, 0) rotate(0deg); }
+                }
+                @keyframes orbitalDrift {
+                    0% { transform: translate(0px, 0px); }
+                    25% { transform: translate(26px, -20px); }
+                    50% { transform: translate(-22px, 24px); }
+                    75% { transform: translate(-26px, -18px); }
+                    100% { transform: translate(0px, 0px); }
+                }
+                @keyframes conveyorTick {
+                    0% { transform: scale(0.94); opacity: 0.7; }
+                    100% { transform: scale(1); opacity: 1; }
                 }
                 @keyframes swapBoard3D {
                     0% { transform: perspective(700px) rotateY(0deg) scale(1); filter: brightness(1); }
@@ -1469,13 +1462,15 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                         : '0 8px 24px rgba(0,0,0,0.4)',
                     margin: 'auto 0',
                     flex: '0 0 auto',
-                    transform: `rotate(${getCarouselAngle()}deg)`,
+                    transform: 'none',
                     animation: isSwappingBoard
                         ? 'swapBoard3D 0.9s cubic-bezier(0.22, 1, 0.36, 1)'
                         : hasEvent('EARTHQUAKE')
                             ? 'chaosShake 0.25s infinite'
-                            : 'none',
-                    transition: 'transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)'
+                            : hasEvent('CAROUSEL')
+                                ? 'orbitalDrift 4.5s ease-in-out infinite'
+                                : 'none',
+                    transition: 'none'
                 }}
             >
                 {boardCells.map((row, r) =>
