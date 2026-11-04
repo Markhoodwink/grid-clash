@@ -59,7 +59,7 @@ interface GameScreenProps {
 const EVENT_INFO: Record<ChaosEvent, { title: string; short: string; color: string }> = {
     NONE: { title: '⏳ Приготовьтесь...', short: '⏳ Спокойствие', color: '#38bdf8' },
     PAINT: { title: '🎨 КРАСКА! Быстро три кляксы пальцем!', short: '🎨 Кляксы', color: '#ec4899' },
-    CAROUSEL: { title: '🎠 КАРУСЕЛЬ! Поле повернулось на 90°!', short: '🎠 Карусель 90°', color: '#f59e0b' },
+    CAROUSEL: { title: '🎠 КАРУСЕЛЬ! Поле вверх ногами (180°)!', short: '🎠 Карусель 180°', color: '#f59e0b' },
     MONOCHROME: { title: '🎭 ХАМЕЛЕОН! Все фигуры одного цвета!', short: '🎭 Хамелеон', color: '#a855f7' },
     EARTHQUAKE: { title: '🌋 ЗЕМЛЕТРЯСЕНИЕ! Держи экран!', short: '🌋 Землетрясение', color: '#ef4444' },
     FLASHLIGHT: { title: '🔦 ТЬМА! Подсвечивай поле пальцем!', short: '🔦 Тьма', color: '#eab308' },
@@ -495,12 +495,11 @@ const SpaceCanvasBackground: React.FC<{ celebrate?: boolean }> = ({ celebrate })
                 ctx.restore();
             });
 
-            // Отрисовка салюта победы
             if (fireworks.length > 0) {
                 fireworks.forEach((p) => {
                     p.x += p.vx;
                     p.y += p.vy;
-                    p.vy += 0.38; // Гравитация
+                    p.vy += 0.38;
                     p.rot += p.vRot;
                     p.alpha = Math.max(0, p.alpha - 0.012);
 
@@ -575,9 +574,8 @@ export const GameScreen: React.FC<GameScreenProps> = ({
     const [roundWinner, setRoundWinner] = useState<{ id: string | null; name: string | null; isAborted?: boolean } | null>(null);
     const [roundResults, setRoundResults] = useState<Player[] | null>(null);
 
-    // Массив активных событий (поддержка одиночных и комбо)
     const [activeEvents, setActiveEvents] = useState<ChaosEvent[]>(['NONE']);
-    const [eventCountdown, setEventCountdown] = useState<number>(3); // 3 сек на старте раунда!
+    const [eventCountdown, setEventCountdown] = useState<number>(3);
     const [paintSplats, setPaintSplats] = useState<PaintSplat[]>([]);
     const [isMuted, setIsMuted] = useState<boolean>(sfx.muted);
 
@@ -591,9 +589,9 @@ export const GameScreen: React.FC<GameScreenProps> = ({
     const [endRoundVotes, setEndRoundVotes] = useState<string[]>([]);
     const [totalRoomPlayers, setTotalRoomPlayers] = useState<number>(Object.keys(players).length || 1);
 
-    // Эмодзи-реакции
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [playerReactions, setPlayerReactions] = useState<Record<string, { emoji: string; ts: number }>>({});
+    const [recentReaction, setRecentReaction] = useState<{ emoji: string; name: string } | null>(null);
 
     const dragStartPointerRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
     const dragStartPiecePosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -615,7 +613,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 
     const hasEvent = (ev: ChaosEvent) => activeEvents.includes(ev);
 
-    // Локальное применение событий
     const activateChaosEventsLocally = (eventsList: ChaosEvent[]) => {
         setActiveEvents(eventsList);
         eventsList.forEach((ev) => sfx.playEvent(ev));
@@ -629,7 +626,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
         if (eventsList.includes('ICE')) {
             const frozen: Record<string, number> = {};
             piecesRef.current.forEach((p) => {
-                if (p.row === null) frozen[p.id] = 3; // 3 удара
+                if (p.row === null) frozen[p.id] = 3;
             });
             setFrozenPieces(frozen);
         } else {
@@ -688,6 +685,9 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 
         socket.on('player_reaction', ({ emoji, playerId }: { emoji: string; playerId: string }) => {
             sfx.playReaction(emoji);
+            const senderName = players[playerId]?.name || (playerId === myId ? 'Вы' : 'Игрок');
+            setRecentReaction({ emoji, name: senderName });
+            setTimeout(() => setRecentReaction(null), 2000);
             setPlayerReactions((prev) => ({
                 ...prev,
                 [playerId]: { emoji, ts: Date.now() }
@@ -716,7 +716,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
             socket.off('end_round_vote_updated');
             socket.off('round_ended');
         };
-    }, [myId]);
+    }, [myId, players]);
 
     const spawnPaintSplats = () => {
         const count = 5;
@@ -733,7 +733,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({
         setPaintSplats(newSplats);
     };
 
-    // Таймер: 3 сек старт, со 2-го цикла умное комбо (Кат А + Кат Б)
     useEffect(() => {
         if (roundResults) return;
 
@@ -751,20 +750,20 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                     let nextEvents: ChaosEvent[] = [];
                     const playerCount = Object.keys(players).length;
 
-                    // Редкий СВАП (всегда соло)
                     const rollSwap = playerCount >= 2 && Math.random() < 0.15 && !activeEventsRef.current.includes('SWAP');
 
                     if (rollSwap) {
                         nextEvents = ['SWAP'];
-                    } else if (cycle === 1) {
-                        // 1-й цикл: 1 одиночный ивент
-                        const allRegular = [...catA, ...catB];
-                        nextEvents = [allRegular[Math.floor(Math.random() * allRegular.length)]];
                     } else {
-                        // Со 2-го цикла: комбо (1 из А + 1 из Б)
-                        const evA = catA[Math.floor(Math.random() * catA.length)];
-                        const evB = catB[Math.floor(Math.random() * catB.length)];
-                        nextEvents = [evA, evB];
+                        const isCombo = cycle > 1 && Math.random() < 0.33;
+                        if (isCombo) {
+                            const evA = catA[Math.floor(Math.random() * catA.length)];
+                            const evB = catB[Math.floor(Math.random() * catB.length)];
+                            nextEvents = [evA, evB];
+                        } else {
+                            const allRegular = [...catA, ...catB];
+                            nextEvents = [allRegular[Math.floor(Math.random() * allRegular.length)]];
+                        }
                     }
 
                     socket.emit('host_chaos_event', { code: roomCode, events: nextEvents });
@@ -878,41 +877,26 @@ export const GameScreen: React.FC<GameScreenProps> = ({
         setDragPos({ x: e.clientX, y: e.clientY });
     };
 
-    // Точный расчет прилипания с учетом 90° поворота Карусели
     const getSnapTarget = () => {
         if (!draggedPiece || !dragPos || !boardRef.current) return null;
 
         const boardRect = boardRef.current.getBoundingClientRect();
         const padding = 10;
-        const isCarousel = hasEvent('CAROUSEL');
 
-        let px = dragPos.x;
-        let py = dragPos.y;
+        const pieceTopLeftX = dragPos.x - grabOffset.x;
+        const pieceTopLeftY = dragPos.y - grabOffset.y;
 
-        // Разворот точки обратно на -90° относительно центра поля
-        if (isCarousel) {
-            const cx = boardRect.left + boardRect.width / 2;
-            const cy = boardRect.top + boardRect.height / 2;
-            const dx = px - cx;
-            const dy = py - cy;
-            px = cx + dy;
-            py = cy - dx;
-        }
+        const relX = pieceTopLeftX - (boardRect.left + padding);
+        const relY = pieceTopLeftY - (boardRect.top + padding);
 
-        const pieceTopLeftX = px - grabOffset.x;
-        const pieceTopLeftY = py - grabOffset.y;
-
-        const unrotatedLeft = (boardRect.left + boardRect.width / 2) - (level.gridWidth * STEP) / 2;
-        const unrotatedTop = (boardRect.top + boardRect.height / 2) - (level.gridHeight * STEP) / 2;
-
-        const relX = pieceTopLeftX - (unrotatedLeft + padding);
-        const relY = pieceTopLeftY - (unrotatedTop + padding);
-
-        const col = Math.round(relX / STEP);
-        const row = Math.round(relY / STEP);
+        const rawCol = Math.round(relX / STEP);
+        const rawRow = Math.round(relY / STEP);
 
         const shapeRows = draggedPiece.matrix.length;
         const shapeCols = draggedPiece.matrix[0].length;
+
+        const col = hasEvent('CAROUSEL') ? level.gridWidth - shapeCols - rawCol : rawCol;
+        const row = hasEvent('CAROUSEL') ? level.gridHeight - shapeRows - rawRow : rawRow;
 
         const inBounds =
             row >= 0 &&
@@ -972,7 +956,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({
         }
     };
 
-    // Перемещение пальца с поддержкой инверсии только по X
     useEffect(() => {
         if (!draggedId) return;
 
@@ -981,7 +964,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
             const dx = e.clientX - dragStartPointerRef.current.x;
 
             const targetX = hasInvertX ? dragStartPiecePosRef.current.x - dx : e.clientX;
-            const targetY = e.clientY; // Y всегда естественный и плавный
+            const targetY = e.clientY;
 
             setDragPos({ x: targetX, y: targetY });
             setLightPos({ x: targetX, y: targetY });
@@ -1061,7 +1044,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({
     const trayPieces = pieces.filter((p) => p.row === null);
     const hasVotedEndRound = endRoundVotes.includes(myId);
 
-    // Заголовок текущего ивента / комбо
     const bannerTitle =
         activeEvents.length > 1
             ? `⚡ КОМБО: ${EVENT_INFO[activeEvents[0]].short} + ${EVENT_INFO[activeEvents[1]].short}!`
@@ -1130,6 +1112,31 @@ export const GameScreen: React.FC<GameScreenProps> = ({
             {/* 0. Космический Canvas-фон + салют при победе */}
             <SpaceCanvasBackground celebrate={Boolean(roundWinner && !roundWinner.isAborted)} />
 
+            {/* Всплывающая реакция по центру для всех игроков */}
+            {recentReaction && (
+                <div
+                    style={{
+                        position: 'fixed',
+                        top: '18%',
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        zIndex: 10005,
+                        pointerEvents: 'none',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        animation: 'floatReaction 2s ease-out forwards'
+                    }}
+                >
+                    <span style={{ fontSize: 52, filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.5))' }}>
+                        {recentReaction.emoji}
+                    </span>
+                    <span style={{ fontSize: 11, color: '#38bdf8', fontWeight: 700, background: 'rgba(15, 23, 42, 0.85)', padding: '2px 8px', borderRadius: 8, marginTop: 2 }}>
+                        {recentReaction.name}
+                    </span>
+                </div>
+            )}
+
             {/* 1. Верхняя панель */}
             <div style={{ width: '100%', maxWidth: 440, flex: '0 0 auto', position: 'relative', zIndex: 7500 }}>
                 <div
@@ -1188,7 +1195,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                             Код: <b style={{ color: '#38bdf8' }}>{roomCode}</b>
                         </span>
 
-                        {/* Кнопка эмодзи-реакций */}
                         <button
                             onClick={() => setShowEmojiPicker((prev) => !prev)}
                             style={{
@@ -1205,7 +1211,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                             💬
                         </button>
 
-                        {/* Всплывающая панель эмодзи */}
                         {showEmojiPicker && (
                             <div
                                 style={{
@@ -1258,7 +1263,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                     </div>
                 </div>
 
-                {/* Голосование за скип */}
                 {endRoundVotes.length > 0 && (
                     <div
                         style={{
@@ -1301,7 +1305,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                     </div>
                 )}
 
-                {/* Индикатор текущего хаос-ивента или КОМБО */}
                 <div
                     style={{
                         background: '#1e293b',
@@ -1332,7 +1335,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                     </div>
                 </div>
 
-                {/* Лидерборд соперников + летающие эмодзи */}
                 {opponents.length > 0 && (
                     <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2 }}>
                         {opponents.map((opp) => {
@@ -1388,7 +1390,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                 )}
             </div>
 
-            {/* 2. Игровое поле (Карусель: поворот на 90°) */}
+            {/* 2. Игровое поле (Карусель: поворот на 180°) */}
             <div
                 ref={boardRef}
                 style={{
@@ -1409,7 +1411,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                         : '0 8px 24px rgba(0,0,0,0.4)',
                     margin: 'auto 0',
                     flex: '0 0 auto',
-                    transform: hasEvent('CAROUSEL') ? 'rotate(90deg)' : 'none',
+                    transform: hasEvent('CAROUSEL') ? 'rotate(180deg)' : 'none',
                     animation: isSwappingBoard
                         ? 'swapBoard3D 0.9s cubic-bezier(0.22, 1, 0.36, 1)'
                         : hasEvent('EARTHQUAKE')
@@ -1771,7 +1773,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                 </div>
             )}
 
-            {/* 7. Летающая фигура под пальцем (Карусель: поворот на 90°) */}
+            {/* 7. Летающая фигура под пальцем (Карусель: поворот на 180°) */}
             {draggedPiece && dragPos && !roundResults && (
                 <div
                     style={{
@@ -1783,7 +1785,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                         display: 'grid',
                         gridTemplateColumns: `repeat(${draggedPiece.matrix[0].length}, ${CELL_SIZE}px)`,
                         gap: `${CELL_GAP}px`,
-                        transform: hasEvent('CAROUSEL') ? 'rotate(90deg)' : 'none',
+                        transform: hasEvent('CAROUSEL') ? 'rotate(180deg)' : 'none',
                         filter: 'drop-shadow(0 12px 24px rgba(0,0,0,0.6))'
                     }}
                 >
