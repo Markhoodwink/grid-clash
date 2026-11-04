@@ -25,21 +25,29 @@ const roomManager = new RoomManager();
 io.on('connection', (socket) => {
     console.log(`User connected: ${socket.id}`);
 
-    socket.on('create_room', ({ playerName }) => {
-        const room = roomManager.createRoom({ id: socket.id, name: playerName });
+    socket.on('create_room', ({ playerName, userId }) => {
+        const room = roomManager.createRoom({
+            id: socket.id,
+            userId: userId || socket.id,
+            name: playerName
+        });
         socket.join(room.code);
-        socket.emit('room_joined', room); // ✅ Исправлено на строчную j
+        socket.emit('room_joined', room);
     });
 
-    socket.on('join_room', ({ code, playerName }) => {
-        const room = roomManager.joinRoom(code, { id: socket.id, name: playerName });
+    socket.on('join_room', ({ code, playerName, userId }) => {
+        const room = roomManager.joinRoom(code, {
+            id: socket.id,
+            userId: userId || socket.id,
+            name: playerName
+        });
         if (!room) {
-            socket.emit('error_message', 'Комната не найдена или игра уже началась');
+            socket.emit('error_message', 'Комната не найдена');
             return;
         }
         socket.join(room.code);
         io.to(room.code).emit('room_updated', room);
-        socket.emit('room_joined', room); // ✅ Исправлено на строчную j
+        socket.emit('room_joined', room);
     });
 
     socket.on('start_game', ({ code, width, height }) => {
@@ -195,11 +203,61 @@ io.on('connection', (socket) => {
     });
 
     socket.on('disconnect', () => {
-        const room = roomManager.removePlayer(socket.id);
+        // Находим комнату через добавленный метод
+        const room = roomManager.getRoomByPlayerId(socket.id);
         if (room) {
-            if (room.endRoundVotes) {
-                room.endRoundVotes = room.endRoundVotes.filter((id) => id !== socket.id);
+            const player = room.players[socket.id];
+            if (player) {
+                // Если идет матч — помечаем время обрыва и даем 60 сек на возврат
+                if (room.status === 'PLAYING') {
+                    player.disconnectedAt = Date.now();
+                    setTimeout(() => {
+                        // Если за 60 секунд игрок так и не вернулся — удаляем
+                        if (player.disconnectedAt && Date.now() - player.disconnectedAt >= 55000) {
+                            roomManager.removePlayer(player.id);
+                            io.to(room.code).emit('room_updated', room);
+                        }
+                    }, 60000);
+                } else {
+                    roomManager.removePlayer(socket.id);
+                    io.to(room.code).emit('room_updated', room);
+                }
             }
+        }
+    });
+
+    // Бесшовное переподключение после сна браузера
+    socket.on('reconnect_session', ({ code, userId }) => {
+        const room = roomManager.getRoom(code);
+        if (!room) {
+            socket.emit('session_expired');
+            return;
+        }
+
+        // Ищем игрока по его постоянному userId (а не по старому сокету)
+        const existingPlayer = Object.values(room.players).find(p => p.userId === userId);
+
+        if (existingPlayer) {
+            const oldSocketId = existingPlayer.id;
+
+            // Если socket.id изменился — перепривязываем игрока
+            if (oldSocketId !== socket.id) {
+                delete room.players[oldSocketId];
+                existingPlayer.id = socket.id;
+                existingPlayer.disconnectedAt = null;
+                room.players[socket.id] = existingPlayer;
+            }
+
+            socket.join(room.code);
+
+            // Отправляем игроку полное актуальное состояние игры
+            socket.emit('session_restored', {
+                room,
+                level: room.currentLevel,
+                myId: socket.id
+            });
+
+            // Уведомляем остальных, что игрок вернулся
             io.to(room.code).emit('room_updated', room);
         }
     });
@@ -213,3 +271,4 @@ const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
+

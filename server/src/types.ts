@@ -33,3 +33,14 @@ export interface Room {
     currentLevel: LevelData | null;
     endRoundVotes?: string[];
 }
+
+export interface Player {
+    id: string;        // Текущий socket.id
+    userId: string;    // Постоянный ID браузера
+    name: string;
+    isHost: boolean;
+    progress: number;
+    score: number;
+    pieces?: PlacedShape[];
+    disconnectedAt?: number | null; // Время обрыва связи
+}

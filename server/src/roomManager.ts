@@ -50,4 +50,14 @@ export class RoomManager {
         }
         return null;
     }
+
+    // Поиск комнаты по socket.id игрока
+    getRoomByPlayerId(socketId: string): Room | null {
+        for (const room of this.rooms.values()) {
+            if (room.players[socketId]) {
+                return room;
+            }
+        }
+        return null;
+    }
 }

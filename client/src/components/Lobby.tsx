@@ -190,8 +190,9 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
             return;
         }
         setError('');
+        const uid = localStorage.getItem('gc_user_id') || '';
         localStorage.setItem('gc_name', name.trim());
-        socket.emit('create_room', { playerName: name.trim() });
+        socket.emit('create_room', { playerName: name.trim(), userId: uid });
     };
 
     const handleJoinRoom = (e: React.FormEvent) => {
@@ -205,8 +206,9 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
             return;
         }
         setError('');
+        const uid = localStorage.getItem('gc_user_id') || '';
         localStorage.setItem('gc_name', name.trim());
-        socket.emit('join_room', { code, playerName: name.trim() });
+        socket.emit('join_room', { code, playerName: name.trim(), userId: uid });
     };
 
     const setPreset = (size: number) => {
