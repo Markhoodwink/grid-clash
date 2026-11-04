@@ -88,15 +88,16 @@ io.on('connection', (socket) => {
         }
     });
 
-    // Синхронизация хаос-ивента от хоста + обработка СВАПА ДОСОК
-    socket.on('host_chaos_event', ({ code, event }) => {
+    // Синхронизация хаос-ивентов (одиночных и комбо) + Свап досок
+    socket.on('host_chaos_event', ({ code, event, events }: { code: string; event?: string; events?: string[] }) => {
         const room = roomManager.getRoom(code);
         if (!room || room.status !== 'PLAYING' || !room.players[socket.id]?.isHost) return;
 
-        if (event === 'SWAP') {
+        const currentEvents: string[] = events || (event ? [event] : ['NONE']);
+
+        if (currentEvents.includes('SWAP')) {
             const playerIds = Object.keys(room.players);
             if (playerIds.length >= 2) {
-                // Перемешиваем игроков и сдвигаем их доски по кругу (каждый получает чужую доску)
                 const shuffled = [...playerIds].sort(() => Math.random() - 0.5);
                 const snapshots = shuffled.map((id) => ({
                     id,
@@ -128,7 +129,12 @@ io.on('connection', (socket) => {
             }
         }
 
-        io.to(room.code).emit('chaos_event_triggered', { event });
+        io.to(room.code).emit('chaos_event_triggered', { events: currentEvents, event: currentEvents[0] });
+    });
+
+    // Быстрые эмодзи-реакции
+    socket.on('send_reaction', ({ code, emoji, playerId }) => {
+        io.to(code).emit('player_reaction', { emoji, playerId: playerId || socket.id });
     });
 
     // Голосование за досрочное завершение раунда
