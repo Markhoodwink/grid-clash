@@ -1042,7 +1042,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 
             if (snap && snap.isValid) {
                 sfx.playSnap();
-                if ('vibrate' in navigator) navigator.vibrate([38, 20, 25]);
+                if ('vibrate' in navigator) navigator.vibrate(8);
 
                 const updated = currentPieces.map((p) =>
                     p.id === piece.id ? { ...p, row: snap.row, col: snap.col } : p

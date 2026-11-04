@@ -31,7 +31,7 @@ const BG_SHAPES = [
     { matrix: [[1, 1, 1], [1, 0, 0]], color: '#ef4444' }          // J (коралловый)
 ];
 
-// Автономный фоновый холст Canvas (гарантированные 60 FPS на любом телефоне)
+// Автономный фоновый холст Canvas (60 FPS)
 const SpaceCanvasBackground: React.FC = () => {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -52,15 +52,14 @@ const SpaceCanvasBackground: React.FC = () => {
         };
         window.addEventListener('resize', handleResize);
 
-        // 14 фигур, сразу распределенных по всей площади экрана
         const items = Array.from({ length: 14 }, (_, i) => {
             const shape = BG_SHAPES[i % BG_SHAPES.length];
-            const cellSize = 22 + Math.floor(Math.random() * 8); // 22-30px
+            const cellSize = 22 + Math.floor(Math.random() * 8);
             return {
                 shape,
                 cellSize,
                 x: Math.random() * width,
-                y: Math.random() * height, // Сразу видны на экране при открытии!
+                y: Math.random() * height,
                 speedY: 0.5 + Math.random() * 0.7,
                 speedX: (Math.random() - 0.5) * 0.25,
                 rot: Math.random() * Math.PI * 2,
@@ -88,7 +87,6 @@ const SpaceCanvasBackground: React.FC = () => {
         const render = () => {
             ctx.clearRect(0, 0, width, height);
 
-            // Фоновые мягкие неоновые туманности (Ambient Glow)
             const grad1 = ctx.createRadialGradient(width * 0.2, height * 0.2, 10, width * 0.2, height * 0.2, 300);
             grad1.addColorStop(0, 'rgba(56, 189, 248, 0.20)');
             grad1.addColorStop(1, 'transparent');
@@ -101,7 +99,6 @@ const SpaceCanvasBackground: React.FC = () => {
             ctx.fillStyle = grad2;
             ctx.fillRect(0, 0, width, height);
 
-            // Отрисовка парящих фигур
             items.forEach((item) => {
                 item.y -= item.speedY;
                 item.x += item.speedX;
@@ -182,6 +179,7 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
     const [error, setError] = useState('');
     const [gridWidth, setGridWidth] = useState<number>(4);
     const [gridHeight, setGridHeight] = useState<number>(4);
+    const [showGuide, setShowGuide] = useState<boolean>(false);
 
     const handleCreateRoom = (e: React.FormEvent) => {
         e.preventDefault();
@@ -251,12 +249,15 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
         .primary-btn:active {
           transform: scale(0.97);
         }
+        .guide-btn:active {
+          transform: scale(0.95);
+        }
       `}</style>
 
-            {/* 1. Безотказный Canvas-фон с фигурами */}
+            {/* 1. Canvas-фон */}
             <SpaceCanvasBackground />
 
-            {/* 2. Карточка меню со стеклянным эффектом */}
+            {/* 2. Карточка меню */}
             <div
                 style={{
                     position: 'relative',
@@ -272,6 +273,35 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                     border: '1px solid rgba(255, 255, 255, 0.14)'
                 }}
             >
+                {/* Кнопка "Гайд" в правом верхнем углу */}
+                <button
+                    type="button"
+                    className="guide-btn"
+                    onClick={() => setShowGuide(true)}
+                    style={{
+                        position: 'absolute',
+                        top: 14,
+                        right: 14,
+                        background: 'rgba(30, 41, 59, 0.75)',
+                        border: '1px solid rgba(255, 255, 255, 0.18)',
+                        color: '#cbd5e1',
+                        borderRadius: 10,
+                        padding: '5px 10px',
+                        fontSize: 12,
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        zIndex: 10,
+                        backdropFilter: 'blur(8px)',
+                        WebkitBackdropFilter: 'blur(8px)',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
+                    }}
+                >
+                    <span>📖</span> Гайд
+                </button>
+
                 {!room ? (
                     <div>
                         <div style={{ textAlign: 'center', marginBottom: 22 }}>
@@ -639,6 +669,153 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                     </div>
                 )}
             </div>
+
+            {/* 3. Модальное окно гайда */}
+            {showGuide && (
+                <div
+                    onClick={() => setShowGuide(false)}
+                    style={{
+                        position: 'fixed',
+                        inset: 0,
+                        background: 'rgba(3, 7, 18, 0.85)',
+                        backdropFilter: 'blur(10px)',
+                        WebkitBackdropFilter: 'blur(10px)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 10000,
+                        padding: 16
+                    }}
+                >
+                    <div
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                            background: 'rgba(15, 23, 42, 0.96)',
+                            border: '1px solid rgba(56, 189, 248, 0.35)',
+                            borderRadius: 22,
+                            padding: '20px 18px',
+                            maxWidth: 420,
+                            width: '100%',
+                            maxHeight: '84vh',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            boxShadow: '0 25px 60px rgba(0, 0, 0, 0.7), 0 0 35px rgba(56, 189, 248, 0.2)',
+                            boxSizing: 'border-box'
+                        }}
+                    >
+                        {/* Заголовок модалки */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span style={{ fontSize: 22 }}>📖</span>
+                                <h2 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: '#f8fafc' }}>
+                                    Гайд по игре
+                                </h2>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setShowGuide(false)}
+                                style={{
+                                    background: 'rgba(51, 65, 85, 0.6)',
+                                    border: 'none',
+                                    color: '#94a3b8',
+                                    width: 28,
+                                    height: 28,
+                                    borderRadius: '50%',
+                                    fontSize: 16,
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                }}
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        {/* Скролл с правилами */}
+                        <div
+                            style={{
+                                overflowY: 'auto',
+                                paddingRight: 4,
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: 14,
+                                fontSize: 13,
+                                color: '#cbd5e1',
+                                lineHeight: 1.45
+                            }}
+                        >
+                            {/* Суть игры */}
+                            <div style={{ background: 'rgba(2, 6, 23, 0.6)', padding: 12, borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)' }}>
+                                <div style={{ fontWeight: 800, color: '#38bdf8', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    <span>🧩</span> Суть игры
+                                </div>
+                                Заполните поле фигурами быстрее соперников на 100%. Фигуры не должны накладываться друг на друга или выходить за границы доски.
+                            </div>
+
+                            {/* Управление */}
+                            <div style={{ background: 'rgba(2, 6, 23, 0.6)', padding: 12, borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)' }}>
+                                <div style={{ fontWeight: 800, color: '#f59e0b', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    <span>🎮</span> Управление
+                                </div>
+                                <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                    <li><b>Зажать и тянуть:</b> перетаскивание фигуры из лотка на поле.</li>
+                                    <li><b>↻ Повернуть:</b> кнопка под каждой фигурой вращает её по часовой стрелке.</li>
+                                    <li><b>Снять фигуру:</b> потяните установленную деталь с доски вниз в лоток.</li>
+                                </ul>
+                            </div>
+
+                            {/* Хаос-ивенты */}
+                            <div style={{ background: 'rgba(2, 6, 23, 0.6)', padding: 12, borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)' }}>
+                                <div style={{ fontWeight: 800, color: '#ec4899', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    <span>🌪️</span> Хаос-ивенты (каждые 10с)
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12 }}>
+                                    <div>🎨 <b>Кляксы:</b> стирайте кляксы краски быстрыми свайпами по экрану.</div>
+                                    <div>🎠 <b>Карусель:</b> плавный поворот доски (сначала на 90°, затем на 180°).</div>
+                                    <div>🧊 <b>Заморозка:</b> стучите по льду (3 удара), чтобы освободить деталь.</div>
+                                    <div>🪞 <b>Зеркало X:</b> палец по горизонтали тянет фигуру в обратную сторону.</div>
+                                    <div>🌫️ <b>Туман войны:</b> фигуры в лотке спрятаны под «❓» до касания.</div>
+                                    <div>🔦 <b>Тьма:</b> поле скрыто тьмой, палец работает фонариком.</div>
+                                    <div>🎭 <b>Хамелеон:</b> все фигуры на время становятся одного цвета.</div>
+                                    <div>👀 <b>Призраки:</b> собранные на поле детали становятся почти невидимыми.</div>
+                                    <div>🌀 <b>Свап досок:</b> редкий супер-ивент — моментальный обмен полями с соперником!</div>
+                                </div>
+                            </div>
+
+                            {/* Комбо */}
+                            <div style={{ background: 'rgba(2, 6, 23, 0.6)', padding: 12, borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)' }}>
+                                <div style={{ fontWeight: 800, color: '#f43f5e', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    <span>⚡</span> Умные комбо (33% шанс)
+                                </div>
+                                Со 2-го цикла раунда игра может запустить 2 события одновременно (например, <i>Заморозка + Зеркало X</i> или <i>Карусель + Туман</i>).
+                            </div>
+                        </div>
+
+                        {/* Кнопка закрытия */}
+                        <button
+                            type="button"
+                            className="primary-btn"
+                            onClick={() => setShowGuide(false)}
+                            style={{
+                                marginTop: 14,
+                                padding: 12,
+                                borderRadius: 12,
+                                background: 'linear-gradient(135deg, #0284c7 0%, #2563eb 100%)',
+                                color: '#fff',
+                                border: 'none',
+                                fontWeight: 800,
+                                fontSize: 14,
+                                cursor: 'pointer',
+                                boxShadow: '0 4px 16px rgba(2, 132, 199, 0.4)'
+                            }}
+                        >
+                            Всё понятно, в игру! 🚀
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
