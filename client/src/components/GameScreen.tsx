@@ -744,13 +744,21 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                     cycleCountRef.current += 1;
                     const cycle = cycleCountRef.current;
 
-                    const catA: ChaosEvent[] = ['CAROUSEL', 'INVERT_X', 'ICE', 'EARTHQUAKE'];
-                    const catB: ChaosEvent[] = ['FOG', 'GHOST', 'MONOCHROME', 'PAINT', 'FLASHLIGHT'];
+                    const prevEvents = activeEventsRef.current;
+
+                    const poolA: ChaosEvent[] = ['CAROUSEL', 'INVERT_X', 'ICE', 'EARTHQUAKE'];
+                    const poolB: ChaosEvent[] = ['FOG', 'GHOST', 'MONOCHROME', 'PAINT', 'FLASHLIGHT'];
+
+                    // Исключаем любые ивенты, которые были в предыдущем раунде
+                    let catA = poolA.filter((ev) => !prevEvents.includes(ev));
+                    let catB = poolB.filter((ev) => !prevEvents.includes(ev));
+                    if (catA.length === 0) catA = poolA;
+                    if (catB.length === 0) catB = poolB;
 
                     let nextEvents: ChaosEvent[] = [];
                     const playerCount = Object.keys(players).length;
 
-                    const rollSwap = playerCount >= 2 && Math.random() < 0.15 && !activeEventsRef.current.includes('SWAP');
+                    const rollSwap = playerCount >= 2 && Math.random() < 0.15 && !prevEvents.includes('SWAP');
 
                     if (rollSwap) {
                         nextEvents = ['SWAP'];
