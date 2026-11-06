@@ -635,6 +635,7 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                                         <li><b>Зажать и тянуть:</b> перетаскивание фигуры на поле.</li>
                                         <li><b>↻ Повернуть:</b> вращение фигуры по часовой стрелке.</li>
                                         <li><b>Снять фигуру:</b> потяните установленную деталь вниз в лоток.</li>
+                                        <li><b>⭐ Джокер:</b> нажмите «Поставить в паз», чтобы фигура автоматически нашла свое место.</li>
                                     </ul>
                                 </div>
                             </div>
@@ -657,7 +658,20 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                                     <div>🌀 <b>Свап досок:</b> редкий супер-ивент — моментальный обмен полями!</div>
                                 </div>
                             </div>
-
+                            {/* Подарки судьбы (Баффы) */}
+                            <div style={{ background: 'rgba(2, 6, 23, 0.6)', padding: 14, borderRadius: 12, border: '1px solid rgba(56, 189, 248, 0.3)' }}>
+                                <div style={{ fontWeight: 800, color: '#38bdf8', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6, fontSize: 14 }}>
+                                    <span>✨</span> Подарки судьбы (Баффы вместо хаоса)
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '8px 16px', fontSize: 12 }}>
+                                    <div>🛡️ <b>Тотем:</b> полная неуязвимость — пока у всех бушует хаос, вы спокойно собираете в тишине.</div>
+                                    <div>🔬 <b>Рентген:</b> сетка дважды мигает точным чертежом идеальной сборки уровня.</div>
+                                    <div>⭐ <b>Джокер:</b> дает кнопку авто-посадки — фигура встает на свое место золотым сиянием (1 раз).</div>
+                                </div>
+                                <div style={{ marginTop: 8, fontSize: 11, color: '#94a3b8' }}>
+                                    💡 <i>Баффы выпадают персонально случайным игрокам взамен плохого ивента. В списке игроков сверху виден значок удачи!</i>
+                                </div>
+                            </div>
                             {/* Комбо */}
                             <div style={{ background: 'rgba(2, 6, 23, 0.6)', padding: 14, borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)' }}>
                                 <div style={{ fontWeight: 800, color: '#f43f5e', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6, fontSize: 14 }}>
@@ -665,6 +679,7 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                                 </div>
                                 Со 2-го цикла раунда игра может запустить 2 события одновременно (например, <i>Заморозка + Зеркало X</i> или <i>Мегакарусель + Туман</i>).
                             </div>
+
                         </div>
 
                         {/* Кнопка закрытия */}
