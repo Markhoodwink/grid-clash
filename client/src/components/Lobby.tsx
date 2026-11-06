@@ -103,10 +103,61 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
         }
       `}</style>
 
-            {/* 1. Canvas-фон */}
+            {/* 1. Безотказный Canvas-фон с фигурами */}
             <SpaceCanvasBackground />
 
-            {/* 2. Карточка меню */}
+            {/* Фиксированные плашки в самом углу экрана (ВНЕ карточки со стеклом!) */}
+            <div
+                style={{
+                    position: 'fixed',
+                    top: 'max(14px, env(safe-area-inset-top, 14px))',
+                    right: 16,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    zIndex: 999
+                }}
+            >
+                <span
+                    style={{
+                        fontSize: 11,
+                        fontWeight: 800,
+                        color: '#38bdf8',
+                        background: 'rgba(15, 23, 42, 0.85)',
+                        padding: '4px 8px',
+                        borderRadius: 8,
+                        border: '1px solid rgba(56, 189, 248, 0.35)',
+                        letterSpacing: 0.5,
+                        boxShadow: '0 2px 10px rgba(0,0,0,0.5)'
+                    }}
+                >
+                    v2.2
+                </span>
+
+                <button
+                    type="button"
+                    className="guide-btn"
+                    onClick={() => setShowGuide(true)}
+                    style={{
+                        background: 'rgba(30, 41, 59, 0.85)',
+                        border: '1px solid rgba(255, 255, 255, 0.18)',
+                        color: '#cbd5e1',
+                        borderRadius: 10,
+                        padding: '5px 10px',
+                        fontSize: 12,
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        boxShadow: '0 2px 10px rgba(0,0,0,0.4)'
+                    }}
+                >
+                    <span>📖</span> Гайд
+                </button>
+            </div>
+
+            {/* 2. Карточка меню со стеклянным эффектом */}
             <div
                 style={{
                     position: 'relative',

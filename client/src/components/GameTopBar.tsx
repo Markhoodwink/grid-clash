@@ -46,8 +46,6 @@ interface GameTopBarProps {
     onForceEvent?: (event: ChaosEvent) => void;
 }
 
-
-
 export const GameTopBar: React.FC<GameTopBarProps> = ({
     roomCode,
     isHost,
@@ -72,9 +70,14 @@ export const GameTopBar: React.FC<GameTopBarProps> = ({
     const [adminPass, setAdminPass] = useState('');
     const [isAdmin, setIsAdmin] = useState(false);
     const [adminError, setAdminError] = useState(false);
+    const [showDevModal, setShowDevModal] = useState(false);
+    const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
     const handleCodeClick = () => {
-        if (isAdmin) return;
+        if (isAdmin) {
+            setShowDevModal(true);
+            return;
+        }
         setCodeClicks((prev) => {
             const next = prev + 1;
             if (next >= 3) {
@@ -90,13 +93,18 @@ export const GameTopBar: React.FC<GameTopBarProps> = ({
         if (adminPass.trim() === 'Kunka') {
             setIsAdmin(true);
             setShowPassInput(false);
+            setShowDevModal(true);
             setAdminPass('');
             setAdminError(false);
         } else {
             setAdminError(true);
         }
     };
-    const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+
+    const triggerAndClose = (ev: ChaosEvent) => {
+        if (onForceEvent) onForceEvent(ev);
+        setShowDevModal(false);
+    };
 
     const bannerTitle =
         activeEvents.length > 1
@@ -112,7 +120,7 @@ export const GameTopBar: React.FC<GameTopBarProps> = ({
 
     return (
         <div style={{ width: '100%', maxWidth: 440, flex: '0 0 auto', position: 'relative', zIndex: 7500 }}>
-            {/* Верхние кнопки управления */}
+            {/* Верхняя строка кнопок */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, gap: 6 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <button
@@ -203,46 +211,25 @@ export const GameTopBar: React.FC<GameTopBarProps> = ({
                         </form>
                     )}
 
-                    {/* Панель выбора любого ивента для тестов */}
-                    {isAdmin && onForceEvent && (
-                        <select
-                            onChange={(e) => {
-                                const ev = e.target.value as ChaosEvent;
-                                if (ev) {
-                                    onForceEvent(ev);
-                                    e.target.value = '';
-                                }
-                            }}
-                            defaultValue=""
+                    {/* Кнопка открытия красивой Dev-панели */}
+                    {isAdmin && (
+                        <button
+                            type="button"
+                            onClick={() => setShowDevModal(true)}
                             style={{
                                 background: 'linear-gradient(135deg, #e11d48 0%, #be123c 100%)',
                                 color: '#fff',
                                 border: '1px solid #fda4af',
-                                borderRadius: 6,
+                                borderRadius: 8,
                                 fontSize: 11,
                                 fontWeight: 800,
-                                padding: '2px 4px',
+                                padding: '3px 8px',
                                 cursor: 'pointer',
-                                outline: 'none',
                                 boxShadow: '0 0 10px rgba(225, 29, 72, 0.5)'
                             }}
                         >
-                            <option value="" disabled>⚡ Тест ивента...</option>
-                            <option value="NONE">⏳ Спокойствие</option>
-                            <option value="PAINT">🎨 Кляксы</option>
-                            <option value="CAROUSEL">🎠 Мегакарусель</option>
-                            <option value="EARTHQUAKE">🌋 Землетрясение</option>
-                            <option value="ICE">🧊 Заморозка</option>
-                            <option value="GHOST">👀 Призраки</option>
-                            <option value="INVERT_X">🪞 Зеркало X</option>
-                            <option value="FOG">🌫️ Туман</option>
-                            <option value="FLASHLIGHT">🔦 Тьма</option>
-                            <option value="MONOCHROME">🎭 Хамелеон</option>
-                            <option value="SWAP">🌀 Свап досок</option>
-                            <option value="TOTEM">🛡️ Тотем (Бафф)</option>
-                            <option value="XRAY">🔬 Рентген (Бафф)</option>
-                            <option value="JOKER">⭐ Джокер (Бафф)</option>
-                        </select>
+                            ⚡ Чит-меню
+                        </button>
                     )}
 
                     <button
@@ -443,6 +430,147 @@ export const GameTopBar: React.FC<GameTopBarProps> = ({
                             </div>
                         );
                     })}
+                </div>
+            )}
+
+            {/* Красивое всплывающее окно Чит-меню */}
+            {showDevModal && (
+                <div
+                    onClick={() => setShowDevModal(false)}
+                    style={{
+                        position: 'fixed',
+                        inset: 0,
+                        background: 'rgba(3, 7, 18, 0.75)',
+                        backdropFilter: 'blur(8px)',
+                        zIndex: 100000,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: 16
+                    }}
+                >
+                    <div
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                            background: 'rgba(15, 23, 42, 0.97)',
+                            border: '1px solid rgba(225, 29, 72, 0.6)',
+                            boxShadow: '0 0 35px rgba(225, 29, 72, 0.4)',
+                            borderRadius: 20,
+                            padding: 18,
+                            maxWidth: 380,
+                            width: '100%',
+                            boxSizing: 'border-box'
+                        }}
+                    >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                            <span style={{ fontSize: 15, fontWeight: 900, color: '#fda4af' }}>
+                                ⚡ ПАНЕЛЬ РАЗРАБОТЧИКА
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => setShowDevModal(false)}
+                                style={{
+                                    background: '#334155',
+                                    border: 'none',
+                                    color: '#cbd5e1',
+                                    borderRadius: '50%',
+                                    width: 26,
+                                    height: 26,
+                                    cursor: 'pointer',
+                                    fontWeight: 800
+                                }}
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        {/* Раздел 1: Баффы */}
+                        <div style={{ fontSize: 11, fontWeight: 800, color: '#38bdf8', marginBottom: 6, textTransform: 'uppercase' }}>
+                            ✨ Баффы (лично мне):
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginBottom: 14 }}>
+                            {[
+                                { ev: 'TOTEM' as ChaosEvent, label: '🛡️ Тотем', color: '#10b981' },
+                                { ev: 'XRAY' as ChaosEvent, label: '🔬 Рентген', color: '#06b6d4' },
+                                { ev: 'JOKER' as ChaosEvent, label: '⭐ Джокер', color: '#f59e0b' }
+                            ].map((b) => (
+                                <button
+                                    key={b.ev}
+                                    type="button"
+                                    onClick={() => triggerAndClose(b.ev)}
+                                    style={{
+                                        padding: '9px 4px',
+                                        borderRadius: 8,
+                                        background: 'rgba(30, 41, 59, 0.8)',
+                                        border: `1px solid ${b.color}`,
+                                        color: b.color,
+                                        fontWeight: 800,
+                                        fontSize: 12,
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    {b.label}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Раздел 2: Дебаффы */}
+                        <div style={{ fontSize: 11, fontWeight: 800, color: '#f43f5e', marginBottom: 6, textTransform: 'uppercase' }}>
+                            🌪️ Дебаффы (для всех):
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6, marginBottom: 14 }}>
+                            {[
+                                { ev: 'PAINT' as ChaosEvent, label: '🎨 Кляксы' },
+                                { ev: 'CAROUSEL' as ChaosEvent, label: '🎠 Карусель' },
+                                { ev: 'EARTHQUAKE' as ChaosEvent, label: '🌋 Землетрясение' },
+                                { ev: 'ICE' as ChaosEvent, label: '🧊 Заморозка' },
+                                { ev: 'GHOST' as ChaosEvent, label: '👀 Призраки' },
+                                { ev: 'INVERT_X' as ChaosEvent, label: '🪞 Зеркало X' },
+                                { ev: 'FOG' as ChaosEvent, label: '🌫️ Туман' },
+                                { ev: 'FLASHLIGHT' as ChaosEvent, label: '🔦 Тьма' },
+                                { ev: 'MONOCHROME' as ChaosEvent, label: '🎭 Хамелеон' },
+                                { ev: 'SWAP' as ChaosEvent, label: '🌀 Свап досок' }
+                            ].map((d) => (
+                                <button
+                                    key={d.ev}
+                                    type="button"
+                                    onClick={() => triggerAndClose(d.ev)}
+                                    style={{
+                                        padding: '7px 8px',
+                                        borderRadius: 8,
+                                        background: 'rgba(30, 41, 59, 0.6)',
+                                        border: '1px solid rgba(255, 255, 255, 0.12)',
+                                        color: '#e2e8f0',
+                                        fontWeight: 700,
+                                        fontSize: 12,
+                                        cursor: 'pointer',
+                                        textAlign: 'left'
+                                    }}
+                                >
+                                    {d.label}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Очистить */}
+                        <button
+                            type="button"
+                            onClick={() => triggerAndClose('NONE')}
+                            style={{
+                                width: '100%',
+                                padding: 10,
+                                borderRadius: 10,
+                                background: '#334155',
+                                border: '1px solid #475569',
+                                color: '#94a3b8',
+                                fontWeight: 800,
+                                fontSize: 13,
+                                cursor: 'pointer'
+                            }}
+                        >
+                            ⏳ Сбросить все ивенты (Спокойствие)
+                        </button>
+                    </div>
                 </div>
             )}
         </div>

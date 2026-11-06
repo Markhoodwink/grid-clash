@@ -430,6 +430,89 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 
         if (hitAny) sfx.playWipeSqueak();
     };
+    const handleAutoPlaceJoker = (piece: PlacedShape) => {
+        if (!level.solutionGrid) return;
+
+        let bestR: number | null = null;
+        let bestC: number | null = null;
+        let bestMatrix: number[][] = piece.matrix;
+
+        // Перебираем все 4 поворота, чтобы гарантированно найти место в решении
+        let testMatrix = piece.matrix;
+        for (let rot = 0; rot < 4; rot++) {
+            const rows = testMatrix.length;
+            const cols = testMatrix[0].length;
+
+            for (let r = 0; r <= level.gridHeight - rows; r++) {
+                for (let c = 0; c <= level.gridWidth - cols; c++) {
+                    let matches = true;
+                    for (let mr = 0; mr < rows; mr++) {
+                        for (let mc = 0; mc < cols; mc++) {
+                            if (testMatrix[mr][mc] === 1) {
+                                if (level.solutionGrid[r + mr]?.[c + mc] !== piece.color) {
+                                    matches = false;
+                                    break;
+                                }
+                            }
+                        }
+                        if (!matches) break;
+                    }
+                    if (matches) {
+                        bestR = r;
+                        bestC = c;
+                        bestMatrix = testMatrix;
+                        break;
+                    }
+                }
+                if (bestR !== null) break;
+            }
+            if (bestR !== null) break;
+            testMatrix = rotateMatrix(testMatrix);
+        }
+
+        if (bestR === null || bestC === null) return;
+
+        // Собираем клетки, куда встанет Джокер
+        const targetCells = new Set<string>();
+        for (let mr = 0; mr < bestMatrix.length; mr++) {
+            for (let mc = 0; mc < bestMatrix[0].length; mc++) {
+                if (bestMatrix[mr][mc] === 1) {
+                    targetCells.add(`${bestR + mr},${bestC + mc}`);
+                }
+            }
+        }
+
+        // Если игрок уже поставил туда другую деталь — возвращаем её в лоток без наложений
+        let bumpedAny = false;
+        const updated = piecesRef.current.map((p) => {
+            if (p.id === piece.id) {
+                return { ...p, matrix: bestMatrix, row: bestR, col: bestC };
+            }
+            if (p.row !== null && p.col !== null) {
+                let overlaps = false;
+                for (let mr = 0; mr < p.matrix.length; mr++) {
+                    for (let mc = 0; mc < p.matrix[0].length; mc++) {
+                        if (p.matrix[mr][mc] === 1 && targetCells.has(`${p.row + mr},${p.col + mc}`)) {
+                            overlaps = true;
+                            break;
+                        }
+                    }
+                    if (overlaps) break;
+                }
+                if (overlaps) {
+                    bumpedAny = true;
+                    return { ...p, row: null, col: null };
+                }
+            }
+            return p;
+        });
+
+        if (bumpedAny) sfx.playReturn();
+        sfx.playSnap();
+        if ('vibrate' in navigator) navigator.vibrate([15, 30, 20]);
+        setPieces(updated);
+        updateTotalProgress(updated);
+    };
 
     const handleRotate = (id: string, e: React.PointerEvent | React.MouseEvent) => {
         e.stopPropagation();
@@ -464,45 +547,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 
     const handleStartDrag = (piece: PlacedShape, e: React.PointerEvent) => {
         if (roundResults || paintSplats.length > 0 || isSwappingBoard) return;
-
-        // Если активен Джокер — фигура мгновенно авто-собирается на правильное место!
-        if (hasEvent('JOKER') && piece.row === null && level.solutionGrid) {
-            // Ищем координаты этой фигуры в решении уровня
-            let targetR: number | null = null;
-            let targetC: number | null = null;
-
-            for (let r = 0; r <= level.gridHeight - piece.matrix.length; r++) {
-                for (let c = 0; c <= level.gridWidth - piece.matrix[0].length; c++) {
-                    let matches = true;
-                    for (let mr = 0; mr < piece.matrix.length; mr++) {
-                        for (let mc = 0; mc < piece.matrix[0].length; mc++) {
-                            if (piece.matrix[mr][mc] === 1 && level.solutionGrid[r + mr]?.[c + mc] !== piece.color) {
-                                matches = false;
-                                break;
-                            }
-                        }
-                        if (!matches) break;
-                    }
-                    if (matches) {
-                        targetR = r;
-                        targetC = c;
-                        break;
-                    }
-                }
-                if (targetR !== null) break;
-            }
-
-            if (targetR !== null && targetC !== null) {
-                sfx.playSnap();
-                if ('vibrate' in navigator) navigator.vibrate([15, 30, 20]);
-                const updated = piecesRef.current.map((p) =>
-                    p.id === piece.id ? { ...p, row: targetR, col: targetC } : p
-                );
-                setPieces(updated);
-                updateTotalProgress(updated);
-                return;
-            }
-        }
 
         setLightPos({ x: e.clientX, y: e.clientY });
 
@@ -1197,25 +1241,48 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                                 )}
                             </div>
 
-                            <button
-                                type="button"
-                                onPointerDown={(e) => e.stopPropagation()}
-                                onClick={(e) => handleRotate(piece.id, e)}
-                                style={{
-                                    fontSize: 10,
-                                    fontWeight: 600,
-                                    padding: '3px 8px',
-                                    background: isFrozen ? '#0e7490' : '#334155',
-                                    color: '#e2e8f0',
-                                    border: 'none',
-                                    borderRadius: 6,
-                                    cursor: 'pointer',
-                                    marginTop: 2,
-                                    marginBottom: 2
-                                }}
-                            >
-                                {isFrozen ? '🔨 Разбить лёд' : '↻ Повернуть'}
-                            </button>
+                            {isJokerPiece ? (
+                                <button
+                                    type="button"
+                                    onPointerDown={(e) => e.stopPropagation()}
+                                    onClick={() => handleAutoPlaceJoker(piece)}
+                                    style={{
+                                        fontSize: 10,
+                                        fontWeight: 800,
+                                        padding: '4px 10px',
+                                        background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                                        color: '#0f172a',
+                                        border: '1px solid #fde047',
+                                        borderRadius: 6,
+                                        cursor: 'pointer',
+                                        marginTop: 2,
+                                        marginBottom: 2,
+                                        boxShadow: '0 0 10px rgba(245, 158, 11, 0.6)'
+                                    }}
+                                >
+                                    ⭐ Поставить в паз
+                                </button>
+                            ) : (
+                                <button
+                                    type="button"
+                                    onPointerDown={(e) => e.stopPropagation()}
+                                    onClick={(e) => handleRotate(piece.id, e)}
+                                    style={{
+                                        fontSize: 10,
+                                        fontWeight: 600,
+                                        padding: '3px 8px',
+                                        background: isFrozen ? '#0e7490' : '#334155',
+                                        color: '#e2e8f0',
+                                        border: 'none',
+                                        borderRadius: 6,
+                                        cursor: 'pointer',
+                                        marginTop: 2,
+                                        marginBottom: 2
+                                    }}
+                                >
+                                    {isFrozen ? '🔨 Разбить лёд' : '↻ Повернуть'}
+                                </button>
+                            )}
                         </div>
                     );
                 })}
