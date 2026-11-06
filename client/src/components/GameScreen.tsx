@@ -84,6 +84,9 @@ export const GameScreen: React.FC<GameScreenProps> = ({
     const [playerReactions, setPlayerReactions] = useState<Record<string, { emoji: string; ts: number }>>({});
     const [recentReaction, setRecentReaction] = useState<{ emoji: string; name: string } | null>(null);
     const [trayShift, setTrayShift] = useState<number>(0);
+    const [jokerUsed, setJokerUsed] = useState<boolean>(false);
+    const [goldPieceIds, setGoldPieceIds] = useState<string[]>([]);
+    const [xrayPulseKey, setXrayPulseKey] = useState<number>(0);
     const [luckyOverrides, setLuckyOverrides] = useState<Record<string, ChaosEvent[]>>({});
     const lastLuckyPlayersRef = useRef<string[]>([]);
 
@@ -123,6 +126,16 @@ export const GameScreen: React.FC<GameScreenProps> = ({
         setActiveEvents(eventsList);
         eventsList.forEach((ev) => sfx.playEvent(ev));
         earthquakeDropsTriggeredRef.current = { second2: false, second8: false };
+
+        // Сброс одноразового использования Джокера при новом ивенте
+        if (eventsList.includes('JOKER')) {
+            setJokerUsed(false);
+        }
+
+        // Запуск синхронного 2-кратного мигания Рентгена для всех клеток
+        if (eventsList.includes('XRAY')) {
+            setXrayPulseKey(Date.now());
+        }
 
         if (eventsList.includes('PAINT')) {
             spawnPaintSplats();
@@ -510,6 +523,12 @@ export const GameScreen: React.FC<GameScreenProps> = ({
         if (bumpedAny) sfx.playReturn();
         sfx.playSnap();
         if ('vibrate' in navigator) navigator.vibrate([15, 30, 20]);
+
+        // 1. Помечаем фигуру как навсегда ЗОЛОТУЮ
+        setGoldPieceIds((prev) => [...prev, piece.id]);
+        // 2. Джокер потрачен — кнопка исчезает и не переходит на другие фигуры!
+        setJokerUsed(true);
+
         setPieces(updated);
         updateTotalProgress(updated);
     };
@@ -938,7 +957,12 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                 playerReactions={playerReactions}
                 onSendReaction={(emoji) => socket.emit('send_reaction', { code: roomCode, emoji, playerId: myId })}
                 onForceEvent={(ev) => {
-                    // Если выбран помогающий бафф — выдаем его лично вам для теста!
+                    if (ev === 'XRAY') {
+                        setXrayPulseKey(Date.now());
+                    }
+                    if (ev === 'JOKER') {
+                        setJokerUsed(false);
+                    }
                     if (ev === 'TOTEM' || ev === 'XRAY' || ev === 'JOKER') {
                         socket.emit('host_chaos_event', {
                             code: roomCode,
@@ -946,7 +970,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                             luckyOverrides: { [myId]: [ev] }
                         });
                     } else {
-                        // Обычные ивенты запускаем на всю комнату
                         socket.emit('host_chaos_event', {
                             code: roomCode,
                             events: [ev]
@@ -1008,7 +1031,8 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 
                         const ghostColor = draggedPiece ? getDisplayColor(draggedPiece.color) : '#38bdf8';
                         const solColor = level.solutionGrid?.[r]?.[c];
-                        const isXrayCell = hasEvent('XRAY') && !cell.color && Boolean(solColor);
+                        const isXrayActive = hasEvent('XRAY') && Boolean(solColor);
+                        const isGoldCell = cell.shape && goldPieceIds.includes(cell.shape.id);
 
                         return (
                             <div
@@ -1021,13 +1045,16 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                                     width: CELL_SIZE,
                                     height: CELL_SIZE,
                                     borderRadius: 8,
+                                    // Если деталь была поставлена Джокером — она навсегда сияет золотом!
                                     background: isGhostCell
                                         ? isGhostValid
                                             ? ghostColor
                                             : '#ef4444'
-                                        : isGhostMode && cell.color
-                                            ? 'rgba(148, 163, 184, 0.14)'
-                                            : cell.color || 'rgba(15, 23, 42, 0.55)',
+                                        : isGoldCell
+                                            ? 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 50%, #d97706 100%)'
+                                            : isGhostMode && cell.color
+                                                ? 'rgba(148, 163, 184, 0.14)'
+                                                : cell.color || 'rgba(15, 23, 42, 0.55)',
                                     opacity: isGhostCell
                                         ? isGhostValid
                                             ? 0.45
@@ -1037,26 +1064,34 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                                         ? isGhostValid
                                             ? `2px solid ${ghostColor}`
                                             : '2px solid #ef4444'
-                                        : isGhostMode && cell.color
-                                            ? '1.5px dashed rgba(226, 232, 240, 0.65)'
-                                            : cell.color
-                                                ? 'none'
-                                                : '1px dashed #334155',
+                                        : isGoldCell
+                                            ? '1.5px solid #fde047'
+                                            : isGhostMode && cell.color
+                                                ? '1.5px dashed rgba(226, 232, 240, 0.65)'
+                                                : cell.color
+                                                    ? 'none'
+                                                    : '1px dashed #334155',
+                                    boxShadow: isGoldCell
+                                        ? '0 0 14px rgba(245, 158, 11, 0.75), inset 0 0 6px rgba(255, 255, 255, 0.4)'
+                                        : 'none',
                                     cursor: cell.shape ? 'grab' : 'default',
                                     transition: 'background 0.05s ease, opacity 0.25s ease'
                                 }}
                             >
-                                {/* Рентген: мягко мигает ровно 2 раза поверх пустой клетки */}
-                                {isXrayCell && (
+                                {/* Рентген: синхронно мигает ровно 2 раза по всей доске поверх любых клеток */}
+                                {isXrayActive && (
                                     <div
+                                        key={`${xrayPulseKey}-${r}-${c}`}
                                         style={{
                                             position: 'absolute',
                                             inset: 0,
                                             borderRadius: 8,
-                                            background: `${solColor}22`,
-                                            border: `1.5px dashed ${solColor}99`,
-                                            animation: 'xrayBlinkTwice 2.2s ease-in-out forwards',
-                                            pointerEvents: 'none'
+                                            background: `${solColor}35`,
+                                            border: `2px dashed ${solColor}`,
+                                            boxShadow: `inset 0 0 8px ${solColor}55`,
+                                            animation: 'xrayBlinkTwice 2s ease-in-out forwards',
+                                            pointerEvents: 'none',
+                                            zIndex: 5
                                         }}
                                     />
                                 )}
@@ -1105,7 +1140,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                     const iceHitsLeft = frozenPieces[piece.id] || 0;
                     const isFrozen = iceHitsLeft > 0;
                     const isFogged = hasEvent('FOG');
-                    const isJokerPiece = hasEvent('JOKER') && piece.id === trayPieces[0]?.id;
+                    const isJokerPiece = hasEvent('JOKER') && !jokerUsed && piece.id === trayPieces[0]?.id;
 
                     return (
                         <div
