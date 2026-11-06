@@ -43,7 +43,10 @@ interface GameTopBarProps {
     luckyOverrides?: Record<string, ChaosEvent[]>;
     playerReactions: Record<string, { emoji: string; ts: number }>;
     onSendReaction: (emoji: string) => void;
+    onForceEvent?: (event: ChaosEvent) => void;
 }
+
+
 
 export const GameTopBar: React.FC<GameTopBarProps> = ({
     roomCode,
@@ -61,8 +64,38 @@ export const GameTopBar: React.FC<GameTopBarProps> = ({
     opponents,
     luckyOverrides = {},
     playerReactions,
-    onSendReaction
+    onSendReaction,
+    onForceEvent
 }) => {
+    const [codeClicks, setCodeClicks] = useState(0);
+    const [showPassInput, setShowPassInput] = useState(false);
+    const [adminPass, setAdminPass] = useState('');
+    const [isAdmin, setIsAdmin] = useState(false);
+    const [adminError, setAdminError] = useState(false);
+
+    const handleCodeClick = () => {
+        if (isAdmin) return;
+        setCodeClicks((prev) => {
+            const next = prev + 1;
+            if (next >= 3) {
+                setShowPassInput(true);
+                return 0;
+            }
+            return next;
+        });
+    };
+
+    const handleVerifyPass = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (adminPass.trim() === 'Kunka') {
+            setIsAdmin(true);
+            setShowPassInput(false);
+            setAdminPass('');
+            setAdminError(false);
+        } else {
+            setAdminError(true);
+        }
+    };
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
     const bannerTitle =
@@ -124,9 +157,93 @@ export const GameTopBar: React.FC<GameTopBarProps> = ({
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, position: 'relative' }}>
-                    <span style={{ fontSize: 12, color: '#64748b' }}>
+                    <span
+                        onClick={handleCodeClick}
+                        style={{ fontSize: 12, color: '#64748b', cursor: 'pointer', userSelect: 'none' }}
+                        title="3 клика для панели создателя"
+                    >
                         Код: <b style={{ color: '#38bdf8' }}>{roomCode}</b>
                     </span>
+
+                    {/* Поле ввода пароля админа */}
+                    {showPassInput && !isAdmin && (
+                        <form onSubmit={handleVerifyPass} style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                            <input
+                                type="password"
+                                placeholder="Пароль..."
+                                autoFocus
+                                value={adminPass}
+                                onChange={(e) => setAdminPass(e.target.value)}
+                                style={{
+                                    width: 72,
+                                    padding: '2px 6px',
+                                    fontSize: 11,
+                                    borderRadius: 6,
+                                    border: adminError ? '1px solid #ef4444' : '1px solid #38bdf8',
+                                    background: '#0f172a',
+                                    color: '#fff',
+                                    outline: 'none'
+                                }}
+                            />
+                            <button
+                                type="submit"
+                                style={{
+                                    padding: '2px 7px',
+                                    fontSize: 10,
+                                    background: '#0284c7',
+                                    color: '#fff',
+                                    border: 'none',
+                                    borderRadius: 6,
+                                    fontWeight: 800,
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                OK
+                            </button>
+                        </form>
+                    )}
+
+                    {/* Панель выбора любого ивента для тестов */}
+                    {isAdmin && onForceEvent && (
+                        <select
+                            onChange={(e) => {
+                                const ev = e.target.value as ChaosEvent;
+                                if (ev) {
+                                    onForceEvent(ev);
+                                    e.target.value = '';
+                                }
+                            }}
+                            defaultValue=""
+                            style={{
+                                background: 'linear-gradient(135deg, #e11d48 0%, #be123c 100%)',
+                                color: '#fff',
+                                border: '1px solid #fda4af',
+                                borderRadius: 6,
+                                fontSize: 11,
+                                fontWeight: 800,
+                                padding: '2px 4px',
+                                cursor: 'pointer',
+                                outline: 'none',
+                                boxShadow: '0 0 10px rgba(225, 29, 72, 0.5)'
+                            }}
+                        >
+                            <option value="" disabled>⚡ Тест ивента...</option>
+                            <option value="NONE">⏳ Спокойствие</option>
+                            <option value="PAINT">🎨 Кляксы</option>
+                            <option value="CAROUSEL">🎠 Мегакарусель</option>
+                            <option value="EARTHQUAKE">🌋 Землетрясение</option>
+                            <option value="ICE">🧊 Заморозка</option>
+                            <option value="GHOST">👀 Призраки</option>
+                            <option value="INVERT_X">🪞 Зеркало X</option>
+                            <option value="FOG">🌫️ Туман</option>
+                            <option value="FLASHLIGHT">🔦 Тьма</option>
+                            <option value="MONOCHROME">🎭 Хамелеон</option>
+                            <option value="SWAP">🌀 Свап досок</option>
+                            <option value="TOTEM">🛡️ Тотем (Бафф)</option>
+                            <option value="XRAY">🔬 Рентген (Бафф)</option>
+                            <option value="JOKER">⭐ Джокер (Бафф)</option>
+                        </select>
+                    )}
 
                     <button
                         onClick={() => setShowEmojiPicker((prev) => !prev)}

@@ -122,16 +122,16 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                     border: '1px solid rgba(255, 255, 255, 0.14)'
                 }}
             >
-                {/* Версия игры и Кнопка "Гайд" в правом верхнем углу */}
+                {/* Версия игры и Кнопка "Гайд" в правом верхнем углу экрана */}
                 <div
                     style={{
-                        position: 'absolute',
+                        position: 'fixed',
                         top: 14,
                         right: 14,
                         display: 'flex',
                         alignItems: 'center',
                         gap: 8,
-                        zIndex: 10
+                        zIndex: 100
                     }}
                 >
                     <span

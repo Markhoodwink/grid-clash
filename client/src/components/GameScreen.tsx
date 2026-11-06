@@ -872,6 +872,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
             )}
 
             {/* Верхняя интерфейсная панель */}
+            {/* Верхняя интерфейсная панель */}
             <GameTopBar
                 roomCode={roomCode}
                 isHost={isHost}
@@ -889,8 +890,25 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                 eventCountdown={eventCountdown}
                 cycleCount={cycleCountRef.current}
                 opponents={opponents}
+                luckyOverrides={luckyOverrides}
                 playerReactions={playerReactions}
                 onSendReaction={(emoji) => socket.emit('send_reaction', { code: roomCode, emoji, playerId: myId })}
+                onForceEvent={(ev) => {
+                    // Если выбран помогающий бафф — выдаем его лично вам для теста!
+                    if (ev === 'TOTEM' || ev === 'XRAY' || ev === 'JOKER') {
+                        socket.emit('host_chaos_event', {
+                            code: roomCode,
+                            events: ['NONE'],
+                            luckyOverrides: { [myId]: [ev] }
+                        });
+                    } else {
+                        // Обычные ивенты запускаем на всю комнату
+                        socket.emit('host_chaos_event', {
+                            code: roomCode,
+                            events: [ev]
+                        });
+                    }
+                }}
             />
 
             {/* Игровое поле: четкий пунктирный контур для призраков */}
