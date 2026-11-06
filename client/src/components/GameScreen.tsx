@@ -1,6 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { rotateMatrix } from '../utils/polyomino';
 import { socket } from '../socket';
+import { sfx, ChaosEvent } from '../utils/soundFX';
+import { SpaceCanvasBackground } from './SpaceCanvasBackground';
+import { GameTopBar, Player } from './GameTopBar';
+import { ChaosOverlays, PaintSplat } from './ChaosOverlays';
+import { GameOverModal } from './GameOverModal';
+import { ExitConfirmModal } from './ExitConfirmModal';
 
 interface Shape {
     id: string;
@@ -12,36 +18,6 @@ interface PlacedShape extends Shape {
     row: number | null;
     col: number | null;
 }
-
-interface Player {
-    id: string;
-    name: string;
-    progress: number;
-    score: number;
-    isHost?: boolean;
-}
-
-interface PaintSplat {
-    id: number;
-    x: number;
-    y: number;
-    size: number;
-    color: string;
-    hp: number;
-}
-
-type ChaosEvent =
-    | 'NONE'
-    | 'PAINT'
-    | 'CAROUSEL'
-    | 'MONOCHROME'
-    | 'EARTHQUAKE'
-    | 'FLASHLIGHT'
-    | 'ICE'
-    | 'GHOST'
-    | 'SWAP'
-    | 'INVERT_X'
-    | 'FOG';
 
 interface GameScreenProps {
     level: {
@@ -56,507 +32,8 @@ interface GameScreenProps {
     myId?: string;
 }
 
-const EVENT_INFO: Record<ChaosEvent, { title: string; short: string; color: string }> = {
-    NONE: { title: '⏳ Приготовьтесь...', short: '⏳ Спокойствие', color: '#38bdf8' },
-    PAINT: { title: '🎨 КРАСКА! Быстро три кляксы пальцем!', short: '🎨 Кляксы', color: '#ec4899' },
-    CAROUSEL: { title: '🎠 МЕГАКАРУСЕЛЬ! Поле дрейфует, лоток движется!', short: '🎠 Мегакарусель', color: '#f59e0b' },
-    MONOCHROME: { title: '🎭 ХАМЕЛЕОН! Все фигуры одного цвета!', short: '🎭 Хамелеон', color: '#a855f7' },
-    EARTHQUAKE: { title: '🌋 ЗЕМЛЕТРЯСЕНИЕ! Держи экран!', short: '🌋 Землетрясение', color: '#ef4444' },
-    FLASHLIGHT: { title: '🔦 ТЬМА! Подсвечивай поле пальцем!', short: '🔦 Тьма', color: '#eab308' },
-    ICE: { title: '🧊 ЗАМОРОЗКА! Тапай по льду, чтобы разбить!', short: '🧊 Заморозка', color: '#06b6d4' },
-    GHOST: { title: '👀 ПРИЗРАКИ! Фигуры почти невидимы!', short: '👀 Призраки', color: '#94a3b8' },
-    SWAP: { title: '🌀 СВАП ДОСОК! Обмен полями с соперником!', short: '🌀 Свап досок', color: '#10b981' },
-    INVERT_X: { title: '🪞 ЗЕРКАЛО! Палец по горизонтали инвертирован!', short: '🪞 Зеркало X', color: '#f43f5e' },
-    FOG: { title: '🌫️ ТУМАН ВОЙНЫ! Фигуры скрыты в лотке!', short: '🌫️ Туман войны', color: '#64748b' }
-};
-
 const SPLAT_COLORS = ['#ec4899', '#8b5cf6', '#10b981', '#f59e0b', '#06b6d4', '#ef4444'];
 const MONO_COLOR = '#8b5cf6';
-const BG_SHAPES = [
-    { matrix: [[1, 1], [1, 1]], color: '#38bdf8' },
-    { matrix: [[1, 1, 1, 1]], color: '#ec4899' },
-    { matrix: [[1, 1, 1], [0, 1, 0]], color: '#a855f7' },
-    { matrix: [[1, 1, 0], [0, 1, 1]], color: '#10b981' },
-    { matrix: [[0, 1], [0, 1], [1, 1]], color: '#f59e0b' },
-    { matrix: [[0, 1, 0], [1, 1, 1], [0, 1, 0]], color: '#06b6d4' },
-    { matrix: [[1, 1, 1], [1, 0, 0]], color: '#ef4444' }
-];
-
-class SoundFX {
-    private ctx: AudioContext | null = null;
-    public muted: boolean = false;
-    private lastSqueakTime: number = 0;
-
-    private getContext(): AudioContext | null {
-        if (this.muted) return null;
-        if (!this.ctx) {
-            const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-            if (AudioCtx) this.ctx = new AudioCtx();
-        }
-        if (this.ctx && this.ctx.state === 'suspended') {
-            this.ctx.resume().catch(() => { });
-        }
-        return this.ctx;
-    }
-
-    playSnap() {
-        const ctx = this.getContext();
-        if (!ctx) return;
-        const now = ctx.currentTime;
-
-        // 1. Механический глухой щелчок (удар плитки)
-        const thudOsc = ctx.createOscillator();
-        const thudGain = ctx.createGain();
-        thudOsc.type = 'triangle';
-        thudOsc.frequency.setValueAtTime(140, now);
-        thudOsc.frequency.exponentialRampToValueAtTime(35, now + 0.05);
-        thudGain.gain.setValueAtTime(0.42, now);
-        thudGain.gain.exponentialRampToValueAtTime(0.001, now + 0.055);
-        thudOsc.connect(thudGain);
-        thudGain.connect(ctx.destination);
-        thudOsc.start(now);
-        thudOsc.stop(now + 0.055);
-
-        // 2. Звонкая фиксация замка
-        const clickOsc = ctx.createOscillator();
-        const clickGain = ctx.createGain();
-        clickOsc.type = 'sine';
-        clickOsc.frequency.setValueAtTime(380, now);
-        clickOsc.frequency.exponentialRampToValueAtTime(720, now + 0.06);
-        clickGain.gain.setValueAtTime(0.24, now);
-        clickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.065);
-        clickOsc.connect(clickGain);
-        clickGain.connect(ctx.destination);
-        clickOsc.start(now);
-        clickOsc.stop(now + 0.065);
-    }
-
-    playReturn() {
-        const ctx = this.getContext();
-        if (!ctx) return;
-        const now = ctx.currentTime;
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(240, now);
-        osc.frequency.exponentialRampToValueAtTime(120, now + 0.08);
-        gain.gain.setValueAtTime(0.15, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(now);
-        osc.stop(now + 0.08);
-    }
-
-    playRotate() {
-        const ctx = this.getContext();
-        if (!ctx) return;
-        const now = ctx.currentTime;
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(320, now);
-        osc.frequency.exponentialRampToValueAtTime(600, now + 0.06);
-        gain.gain.setValueAtTime(0.18, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.065);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(now);
-        osc.stop(now + 0.065);
-    }
-
-    playIceCrack() {
-        const ctx = this.getContext();
-        if (!ctx) return;
-        const now = ctx.currentTime;
-        [950, 1420].forEach((freq, i) => {
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.type = 'sawtooth';
-            osc.frequency.setValueAtTime(freq, now + i * 0.03);
-            osc.frequency.exponentialRampToValueAtTime(freq * 1.4, now + i * 0.03 + 0.05);
-            gain.gain.setValueAtTime(0.18, now + i * 0.03);
-            gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.03 + 0.055);
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.start(now + i * 0.03);
-            osc.stop(now + i * 0.03 + 0.055);
-        });
-    }
-
-    playSwapPortal() {
-        const ctx = this.getContext();
-        if (!ctx) return;
-        const now = ctx.currentTime;
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(140, now);
-        osc.frequency.exponentialRampToValueAtTime(880, now + 0.35);
-        osc.frequency.exponentialRampToValueAtTime(220, now + 0.75);
-        gain.gain.setValueAtTime(0.32, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.78);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(now);
-        osc.stop(now + 0.78);
-    }
-
-    playWipeSqueak() {
-        const nowMs = Date.now();
-        if (nowMs - this.lastSqueakTime < 65) return;
-        this.lastSqueakTime = nowMs;
-
-        const ctx = this.getContext();
-        if (!ctx) return;
-        const now = ctx.currentTime;
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'triangle';
-        const baseFreq = 650 + Math.random() * 250;
-        osc.frequency.setValueAtTime(baseFreq, now);
-        osc.frequency.exponentialRampToValueAtTime(baseFreq * 1.35, now + 0.045);
-        gain.gain.setValueAtTime(0.09, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(now);
-        osc.stop(now + 0.05);
-    }
-
-    playCarousel() {
-        const ctx = this.getContext();
-        if (!ctx) return;
-        const now = ctx.currentTime;
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(240, now);
-        osc.frequency.exponentialRampToValueAtTime(740, now + 0.28);
-        gain.gain.setValueAtTime(0.24, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(now);
-        osc.stop(now + 0.3);
-    }
-
-    playInvert() {
-        const ctx = this.getContext();
-        if (!ctx) return;
-        const now = ctx.currentTime;
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(480, now);
-        osc.frequency.linearRampToValueAtTime(200, now + 0.12);
-        osc.frequency.linearRampToValueAtTime(420, now + 0.24);
-        gain.gain.setValueAtTime(0.18, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.26);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(now);
-        osc.stop(now + 0.26);
-    }
-
-    playFog() {
-        const ctx = this.getContext();
-        if (!ctx) return;
-        const now = ctx.currentTime;
-        [180, 220].forEach((freq, i) => {
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(freq, now + i * 0.05);
-            gain.gain.setValueAtTime(0.16, now + i * 0.05);
-            gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.05 + 0.32);
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.start(now + i * 0.05);
-            osc.stop(now + i * 0.05 + 0.32);
-        });
-    }
-
-    playReaction(emoji: string) {
-        const ctx = this.getContext();
-        if (!ctx) return;
-        const now = ctx.currentTime;
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-
-        if (emoji === '🚀') {
-            osc.type = 'sawtooth';
-            osc.frequency.setValueAtTime(260, now);
-            osc.frequency.exponentialRampToValueAtTime(1050, now + 0.2);
-            gain.gain.setValueAtTime(0.2, now);
-            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
-        } else if (emoji === '😱') {
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(750, now);
-            osc.frequency.linearRampToValueAtTime(380, now + 0.22);
-            gain.gain.setValueAtTime(0.22, now);
-            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.24);
-        } else if (emoji === '🧊') {
-            osc.type = 'triangle';
-            osc.frequency.setValueAtTime(1200, now);
-            osc.frequency.exponentialRampToValueAtTime(550, now + 0.14);
-            gain.gain.setValueAtTime(0.2, now);
-            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
-        } else {
-            osc.type = 'square';
-            osc.frequency.setValueAtTime(150, now);
-            osc.frequency.exponentialRampToValueAtTime(65, now + 0.25);
-            gain.gain.setValueAtTime(0.16, now);
-            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.27);
-        }
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(now);
-        osc.stop(now + 0.3);
-    }
-
-    playEvent(event: ChaosEvent) {
-        if (event === 'CAROUSEL') this.playCarousel();
-        else if (event === 'INVERT_X') this.playInvert();
-        else if (event === 'FOG') this.playFog();
-        else if (event === 'SWAP') this.playSwapPortal();
-        else if (event === 'ICE') {
-            const ctx = this.getContext();
-            if (!ctx) return;
-            const now = ctx.currentTime;
-            [880, 1174.66, 1567.98].forEach((freq, i) => {
-                const osc = ctx.createOscillator();
-                const gain = ctx.createGain();
-                osc.type = 'triangle';
-                osc.frequency.setValueAtTime(freq, now + i * 0.045);
-                gain.gain.setValueAtTime(0.18, now + i * 0.045);
-                gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.045 + 0.2);
-                osc.connect(gain);
-                gain.connect(ctx.destination);
-                osc.start(now + i * 0.045);
-                osc.stop(now + i * 0.045 + 0.2);
-            });
-        }
-    }
-
-    playRoundEnd(isWinner: boolean) {
-        const ctx = this.getContext();
-        if (!ctx) return;
-        const now = ctx.currentTime;
-        const notes = isWinner
-            ? [523.25, 659.25, 783.99, 1046.5]
-            : [392.0, 349.23, 311.13, 261.63];
-
-        notes.forEach((freq, idx) => {
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.type = 'triangle';
-            osc.frequency.setValueAtTime(freq, now + idx * 0.09);
-            gain.gain.setValueAtTime(0.25, now + idx * 0.09);
-            gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.09 + 0.32);
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.start(now + idx * 0.09);
-            osc.stop(now + idx * 0.09 + 0.32);
-        });
-    }
-}
-
-const sfx = new SoundFX();
-
-// Космический холст + салют победителю (60 FPS)
-const SpaceCanvasBackground: React.FC<{ celebrate?: boolean }> = ({ celebrate }) => {
-    const canvasRef = useRef<HTMLCanvasElement | null>(null);
-
-    useEffect(() => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-
-        let animId: number;
-        let width = (canvas.width = window.innerWidth);
-        let height = (canvas.height = window.innerHeight);
-
-        const handleResize = () => {
-            if (!canvas) return;
-            width = canvas.width = window.innerWidth;
-            height = canvas.height = window.innerHeight;
-        };
-        window.addEventListener('resize', handleResize);
-
-        const items = Array.from({ length: 14 }, (_, i) => {
-            const shape = BG_SHAPES[i % BG_SHAPES.length];
-            const cellSize = 20 + Math.floor(Math.random() * 8);
-            return {
-                shape,
-                cellSize,
-                x: Math.random() * width,
-                y: Math.random() * height,
-                speedY: 0.45 + Math.random() * 0.55,
-                speedX: (Math.random() - 0.5) * 0.25,
-                rot: Math.random() * Math.PI * 2,
-                rotSpeed: (Math.random() - 0.5) * 0.01,
-                opacity: 0.35 + Math.random() * 0.25
-            };
-        });
-
-        // Частицы победного салюта
-        let fireworks: Array<{
-            x: number;
-            y: number;
-            vx: number;
-            vy: number;
-            rot: number;
-            vRot: number;
-            size: number;
-            color: string;
-            alpha: number;
-        }> = [];
-
-        if (celebrate) {
-            const colors = ['#38bdf8', '#ec4899', '#a855f7', '#10b981', '#f59e0b', '#facc15'];
-            for (let i = 0; i < 75; i++) {
-                const angle = Math.random() * Math.PI * 2;
-                const speed = 4 + Math.random() * 14;
-                fireworks.push({
-                    x: width / 2,
-                    y: height * 0.45,
-                    vx: Math.cos(angle) * speed,
-                    vy: Math.sin(angle) * speed - 3,
-                    rot: Math.random() * Math.PI * 2,
-                    vRot: (Math.random() - 0.5) * 0.25,
-                    size: 8 + Math.floor(Math.random() * 8),
-                    color: colors[i % colors.length],
-                    alpha: 1
-                });
-            }
-        }
-
-        const drawRoundedRect = (x: number, y: number, s: number, r: number) => {
-            ctx.beginPath();
-            ctx.moveTo(x + r, y);
-            ctx.lineTo(x + s - r, y);
-            ctx.arcTo(x + s, y, x + s, y + s, r);
-            ctx.lineTo(x + s, y + s - r);
-            ctx.arcTo(x + s, y + s, x, y + s, r);
-            ctx.lineTo(x + r, y + s);
-            ctx.arcTo(x, y + s, x, y, r);
-            ctx.lineTo(x, y + r);
-            ctx.arcTo(x, y, x + s, y, r);
-            ctx.closePath();
-            ctx.fill();
-            ctx.stroke();
-        };
-
-        const render = () => {
-            ctx.clearRect(0, 0, width, height);
-
-            const grad1 = ctx.createRadialGradient(width * 0.2, height * 0.2, 10, width * 0.2, height * 0.2, 300);
-            grad1.addColorStop(0, 'rgba(56, 189, 248, 0.16)');
-            grad1.addColorStop(1, 'transparent');
-            ctx.fillStyle = grad1;
-            ctx.fillRect(0, 0, width, height);
-
-            const grad2 = ctx.createRadialGradient(width * 0.8, height * 0.8, 10, width * 0.8, height * 0.8, 320);
-            grad2.addColorStop(0, 'rgba(168, 85, 247, 0.14)');
-            grad2.addColorStop(1, 'transparent');
-            ctx.fillStyle = grad2;
-            ctx.fillRect(0, 0, width, height);
-
-            items.forEach((item) => {
-                item.y -= item.speedY;
-                item.x += item.speedX;
-                item.rot += item.rotSpeed;
-
-                if (item.y < -120) {
-                    item.y = height + 100;
-                    item.x = Math.random() * width;
-                }
-                if (item.x < -80) item.x = width + 80;
-                if (item.x > width + 80) item.x = -80;
-
-                const { matrix, color } = item.shape;
-                const s = item.cellSize;
-                const gap = 3;
-                const rows = matrix.length;
-                const cols = matrix[0].length;
-                const totalW = cols * s + (cols - 1) * gap;
-                const totalH = rows * s + (rows - 1) * gap;
-
-                ctx.save();
-                ctx.translate(item.x, item.y);
-                ctx.rotate(item.rot);
-                ctx.globalAlpha = item.opacity;
-
-                ctx.shadowColor = color;
-                ctx.shadowBlur = 12;
-                ctx.fillStyle = color;
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
-                ctx.lineWidth = 1.2;
-
-                const startX = -totalW / 2;
-                const startY = -totalH / 2;
-
-                for (let r = 0; r < rows; r++) {
-                    for (let c = 0; c < cols; c++) {
-                        if (matrix[r][c] === 1) {
-                            const cellX = startX + c * (s + gap);
-                            const cellY = startY + r * (s + gap);
-                            drawRoundedRect(cellX, cellY, s, 4);
-                        }
-                    }
-                }
-                ctx.restore();
-            });
-
-            if (fireworks.length > 0) {
-                fireworks.forEach((p) => {
-                    p.x += p.vx;
-                    p.y += p.vy;
-                    p.vy += 0.38;
-                    p.rot += p.vRot;
-                    p.alpha = Math.max(0, p.alpha - 0.012);
-
-                    ctx.save();
-                    ctx.translate(p.x, p.y);
-                    ctx.rotate(p.rot);
-                    ctx.globalAlpha = p.alpha;
-                    ctx.fillStyle = p.color;
-                    ctx.shadowColor = p.color;
-                    ctx.shadowBlur = 10;
-                    ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
-                    ctx.restore();
-                });
-                fireworks = fireworks.filter((p) => p.alpha > 0);
-            }
-
-            animId = requestAnimationFrame(render);
-        };
-
-        render();
-
-        return () => {
-            cancelAnimationFrame(animId);
-            window.removeEventListener('resize', handleResize);
-        };
-    }, [celebrate]);
-
-    return (
-        <canvas
-            ref={canvasRef}
-            style={{
-                position: 'fixed',
-                top: 0,
-                left: 0,
-                width: '100%',
-                height: '100%',
-                pointerEvents: 'none',
-                zIndex: 1
-            }}
-        />
-    );
-};
 
 export const GameScreen: React.FC<GameScreenProps> = ({
     level,
@@ -604,7 +81,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({
     const [endRoundVotes, setEndRoundVotes] = useState<string[]>([]);
     const [totalRoomPlayers, setTotalRoomPlayers] = useState<number>(Object.keys(players).length || 1);
 
-    const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [playerReactions, setPlayerReactions] = useState<Record<string, { emoji: string; ts: number }>>({});
     const [recentReaction, setRecentReaction] = useState<{ emoji: string; name: string } | null>(null);
     const [trayShift, setTrayShift] = useState<number>(0);
@@ -720,7 +196,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({
             setRoundResults(leaderboard);
             setDraggedId(null);
             setPaintSplats([]);
-            setShowEmojiPicker(false);
             sfx.playRoundEnd(!isAborted && winnerId === myId);
         });
 
@@ -735,7 +210,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
     }, [myId, players]);
 
     const spawnPaintSplats = () => {
-        const count = 3; // 3 крупные кляксы вместо 5 мелких
+        const count = 3;
         const w = window.innerWidth;
         const h = window.innerHeight;
         const newSplats: PaintSplat[] = Array.from({ length: count }, (_, i) => ({
@@ -759,13 +234,11 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                 if (isHost) {
                     cycleCountRef.current += 1;
                     const cycle = cycleCountRef.current;
-
                     const prevEvents = activeEventsRef.current;
 
                     const poolA: ChaosEvent[] = ['CAROUSEL', 'INVERT_X', 'ICE', 'EARTHQUAKE'];
                     const poolB: ChaosEvent[] = ['FOG', 'GHOST', 'MONOCHROME', 'PAINT', 'FLASHLIGHT'];
 
-                    // Исключаем любые ивенты, которые были в предыдущем раунде
                     let catA = poolA.filter((ev) => !prevEvents.includes(ev));
                     let catB = poolB.filter((ev) => !prevEvents.includes(ev));
                     if (catA.length === 0) catA = poolA;
@@ -773,7 +246,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 
                     let nextEvents: ChaosEvent[] = [];
                     const playerCount = Object.keys(players).length;
-
                     const rollSwap = playerCount >= 2 && Math.random() < 0.15 && !prevEvents.includes('SWAP');
 
                     if (rollSwap) {
@@ -825,7 +297,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({
         const moveStep = Math.hypot(clientX - last.x, clientY - last.y);
         if (moveStep < 10) return;
 
-        // Урон снижен в 1.5 раза — кляксы держатся ощутимо дольше
         const scrubDamage = Math.min(9.3, moveStep * 0.3);
         let hitAny = false;
 
@@ -845,16 +316,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({
         if (hitAny) sfx.playWipeSqueak();
     };
 
-    const toggleMute = () => {
-        sfx.muted = !sfx.muted;
-        setIsMuted(sfx.muted);
-    };
-
-    const sendReaction = (emoji: string) => {
-        socket.emit('send_reaction', { code: roomCode, emoji, playerId: myId });
-        setShowEmojiPicker(false);
-    };
-
     const handleRotate = (id: string, e: React.PointerEvent | React.MouseEvent) => {
         e.stopPropagation();
 
@@ -869,7 +330,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 
         sfx.playRotate();
         setPieces((prev) => {
-            const updated = prev.map((p) => {
+            return prev.map((p) => {
                 if (p.id !== id) return p;
                 const newMatrix = rotateMatrix(p.matrix);
 
@@ -883,7 +344,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                 }
                 return { ...p, matrix: newMatrix };
             });
-            return updated;
         });
     };
 
@@ -926,7 +386,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({
         const pieceTopLeftX = dragPos.x - grabOffset.x;
         const pieceTopLeftY = dragPos.y - grabOffset.y;
 
-        // Позиция относительно текущего положения плывущего поля
         const relX = pieceTopLeftX - (boardRect.left + padding);
         const relY = pieceTopLeftY - (boardRect.top + padding);
 
@@ -1022,7 +481,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 
             if (snap && snap.isValid) {
                 sfx.playSnap();
-                if ('vibrate' in navigator) navigator.vibrate(8);
+                if ('vibrate' in navigator) navigator.vibrate(10);
 
                 const updated = currentPieces.map((p) =>
                     p.id === piece.id ? { ...p, row: snap.row, col: snap.col } : p
@@ -1083,23 +542,10 @@ export const GameScreen: React.FC<GameScreenProps> = ({
     const trayPieces = hasEvent('CAROUSEL') && rawTrayPieces.length > 1
         ? [...rawTrayPieces.slice(trayShift % rawTrayPieces.length), ...rawTrayPieces.slice(0, trayShift % rawTrayPieces.length)]
         : rawTrayPieces;
-    const hasVotedEndRound = endRoundVotes.includes(myId);
-
-    const bannerTitle =
-        activeEvents.length > 1
-            ? `⚡ КОМБО: ${EVENT_INFO[activeEvents[0]].short} + ${EVENT_INFO[activeEvents[1]].short}!`
-            : EVENT_INFO[activeEvents[0]]?.title || 'Спокойствие...';
-
-    const bannerColor =
-        activeEvents.length > 1
-            ? '#f43f5e'
-            : EVENT_INFO[activeEvents[0]]?.color || '#38bdf8';
 
     return (
         <div
-            onPointerDown={(e) => {
-                setLightPos({ x: e.clientX, y: e.clientY });
-            }}
+            onPointerDown={(e) => setLightPos({ x: e.clientX, y: e.clientY })}
             onPointerMove={(e) => {
                 setLightPos({ x: e.clientX, y: e.clientY });
                 if (paintSplats.length > 0) wipePaintAt(e.clientX, e.clientY);
@@ -1140,10 +586,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                     75% { transform: translate(-26px, -18px); }
                     100% { transform: translate(0px, 0px); }
                 }
-                @keyframes conveyorTick {
-                    0% { transform: scale(0.94); opacity: 0.7; }
-                    100% { transform: scale(1); opacity: 1; }
-                }
                 @keyframes swapBoard3D {
                     0% { transform: perspective(700px) rotateY(0deg) scale(1); filter: brightness(1); }
                     45% { transform: perspective(700px) rotateY(180deg) scale(0.65); filter: brightness(2.2) hue-rotate(90deg); }
@@ -1161,288 +603,43 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                 }
             `}</style>
 
-            {/* 0. Космический Canvas-фон + салют при победе */}
+            {/* Фон Canvas */}
             <SpaceCanvasBackground celebrate={Boolean(roundWinner && !roundWinner.isAborted)} />
 
-            {/* Всплывающая реакция по центру для всех игроков */}
-            {recentReaction && (
-                <div
-                    style={{
-                        position: 'fixed',
-                        top: '18%',
-                        left: '50%',
-                        transform: 'translateX(-50%)',
-                        zIndex: 10005,
-                        pointerEvents: 'none',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        animation: 'floatReaction 2s ease-out forwards'
-                    }}
-                >
-                    <span style={{ fontSize: 52, filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.5))' }}>
-                        {recentReaction.emoji}
-                    </span>
-                    <span style={{ fontSize: 11, color: '#38bdf8', fontWeight: 700, background: 'rgba(15, 23, 42, 0.85)', padding: '2px 8px', borderRadius: 8, marginTop: 2 }}>
-                        {recentReaction.name}
-                    </span>
-                </div>
-            )}
+            {/* Оверлеи хаоса: кляксы, фонарик, свап, всплывающее эмодзи */}
+            <ChaosOverlays
+                hasEvent={hasEvent}
+                roundFinished={Boolean(roundResults)}
+                lightPos={lightPos}
+                swapBanner={swapBanner}
+                paintSplats={paintSplats}
+                onWipePaint={wipePaintAt}
+                recentReaction={recentReaction}
+            />
 
-            {/* 1. Верхняя панель */}
-            <div style={{ width: '100%', maxWidth: 440, flex: '0 0 auto', position: 'relative', zIndex: 7500 }}>
-                <div
-                    style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        marginBottom: 6,
-                        gap: 6
-                    }}
-                >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <button
-                            onClick={() => setShowExitConfirm(true)}
-                            style={{
-                                background: 'rgba(30, 41, 59, 0.9)',
-                                border: '1px solid #334155',
-                                color: '#94a3b8',
-                                padding: '5px 10px',
-                                borderRadius: 8,
-                                fontSize: 12,
-                                fontWeight: 600,
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 4
-                            }}
-                        >
-                            🚪 В лобби
-                        </button>
+            {/* Верхняя интерфейсная панель */}
+            <GameTopBar
+                roomCode={roomCode}
+                isHost={isHost}
+                isMuted={isMuted}
+                onToggleMute={() => {
+                    sfx.muted = !sfx.muted;
+                    setIsMuted(sfx.muted);
+                }}
+                onExitClick={() => setShowExitConfirm(true)}
+                endRoundVotes={endRoundVotes}
+                totalRoomPlayers={totalRoomPlayers}
+                hasVotedEndRound={endRoundVotes.includes(myId)}
+                onVoteEndRound={() => socket.emit('vote_end_round', { code: roomCode })}
+                activeEvents={activeEvents}
+                eventCountdown={eventCountdown}
+                cycleCount={cycleCountRef.current}
+                opponents={opponents}
+                playerReactions={playerReactions}
+                onSendReaction={(emoji) => socket.emit('send_reaction', { code: roomCode, emoji, playerId: myId })}
+            />
 
-                        {isHost && endRoundVotes.length === 0 && (
-                            <button
-                                onClick={() => socket.emit('vote_end_round', { code: roomCode })}
-                                style={{
-                                    background: 'rgba(245, 158, 11, 0.15)',
-                                    border: '1px solid #f59e0b',
-                                    color: '#fbbf24',
-                                    padding: '5px 10px',
-                                    borderRadius: 8,
-                                    fontSize: 12,
-                                    fontWeight: 700,
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 4
-                                }}
-                            >
-                                🏳️ Скип раунда
-                            </button>
-                        )}
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, position: 'relative' }}>
-                        <span style={{ fontSize: 12, color: '#64748b' }}>
-                            Код: <b style={{ color: '#38bdf8' }}>{roomCode}</b>
-                        </span>
-
-                        <button
-                            onClick={() => setShowEmojiPicker((prev) => !prev)}
-                            style={{
-                                background: showEmojiPicker ? '#3b82f6' : '#1e293b',
-                                border: '1px solid #334155',
-                                borderRadius: 8,
-                                padding: '4px 7px',
-                                fontSize: 13,
-                                cursor: 'pointer',
-                                color: '#f8fafc'
-                            }}
-                            title="Отправить реакцию"
-                        >
-                            💬
-                        </button>
-
-                        {showEmojiPicker && (
-                            <div
-                                style={{
-                                    position: 'absolute',
-                                    top: 36,
-                                    right: 32,
-                                    background: 'rgba(15, 23, 42, 0.95)',
-                                    border: '1px solid #38bdf8',
-                                    borderRadius: 12,
-                                    padding: '4px 6px',
-                                    display: 'flex',
-                                    gap: 6,
-                                    boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
-                                    zIndex: 10000
-                                }}
-                            >
-                                {['😱', '🚀', '🧊', '💀'].map((em) => (
-                                    <button
-                                        key={em}
-                                        onClick={() => sendReaction(em)}
-                                        style={{
-                                            background: 'none',
-                                            border: 'none',
-                                            fontSize: 20,
-                                            cursor: 'pointer',
-                                            padding: 4
-                                        }}
-                                    >
-                                        {em}
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-
-                        <button
-                            onClick={toggleMute}
-                            style={{
-                                background: '#1e293b',
-                                border: '1px solid #334155',
-                                borderRadius: 8,
-                                padding: '4px 8px',
-                                fontSize: 13,
-                                cursor: 'pointer',
-                                color: '#f8fafc'
-                            }}
-                            title="Звук Вкл/Выкл"
-                        >
-                            {isMuted ? '🔇' : '🔊'}
-                        </button>
-                    </div>
-                </div>
-
-                {endRoundVotes.length > 0 && (
-                    <div
-                        style={{
-                            background: 'rgba(30, 41, 59, 0.96)',
-                            border: '1px solid #f59e0b',
-                            borderRadius: 10,
-                            padding: '6px 10px',
-                            marginBottom: 6,
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            boxShadow: '0 4px 14px rgba(245, 158, 11, 0.25)'
-                        }}
-                    >
-                        <span style={{ fontSize: 12, color: '#fde68a', fontWeight: 600 }}>
-                            🏳️ Завершить раунд? ({endRoundVotes.length}/{totalRoomPlayers})
-                        </span>
-
-                        {!hasVotedEndRound ? (
-                            <button
-                                onClick={() => socket.emit('vote_end_round', { code: roomCode })}
-                                style={{
-                                    background: '#f59e0b',
-                                    color: '#0f172a',
-                                    border: 'none',
-                                    borderRadius: 6,
-                                    padding: '4px 10px',
-                                    fontSize: 12,
-                                    fontWeight: 800,
-                                    cursor: 'pointer'
-                                }}
-                            >
-                                ✓ Завершить
-                            </button>
-                        ) : (
-                            <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>
-                                ⏳ Ждем остальных...
-                            </span>
-                        )}
-                    </div>
-                )}
-
-                <div
-                    style={{
-                        background: '#1e293b',
-                        border: `1px solid ${bannerColor}`,
-                        borderRadius: 10,
-                        padding: '6px 10px',
-                        marginBottom: 6,
-                        boxShadow: `0 0 12px ${bannerColor}33`
-                    }}
-                >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, marginBottom: 4 }}>
-                        <span style={{ fontWeight: 700, color: bannerColor }}>
-                            {bannerTitle}
-                        </span>
-                        <span style={{ fontWeight: 800, color: '#cbd5e1', fontSize: 11 }}>
-                            {eventCountdown}с
-                        </span>
-                    </div>
-                    <div style={{ width: '100%', height: 4, background: '#0f172a', borderRadius: 2, overflow: 'hidden' }}>
-                        <div
-                            style={{
-                                width: `${(eventCountdown / (activeEvents[0] === 'NONE' && cycleCountRef.current === 0 ? 3 : 10)) * 100}%`,
-                                height: '100%',
-                                background: bannerColor,
-                                transition: 'width 0.95s linear'
-                            }}
-                        />
-                    </div>
-                </div>
-
-                {opponents.length > 0 && (
-                    <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2 }}>
-                        {opponents.map((opp) => {
-                            const reaction = playerReactions[opp.id];
-                            const isRecentReaction = reaction && Date.now() - reaction.ts < 2200;
-
-                            return (
-                                <div
-                                    key={opp.id}
-                                    style={{
-                                        position: 'relative',
-                                        flex: 1,
-                                        minWidth: 80,
-                                        background: '#1e293b',
-                                        padding: '4px 7px',
-                                        borderRadius: 8,
-                                        border: '1px solid #334155'
-                                    }}
-                                >
-                                    {isRecentReaction && (
-                                        <div
-                                            style={{
-                                                position: 'absolute',
-                                                top: -24,
-                                                left: '50%',
-                                                fontSize: 20,
-                                                pointerEvents: 'none',
-                                                animation: 'floatReaction 2.2s ease-out forwards'
-                                            }}
-                                        >
-                                            {reaction.emoji}
-                                        </div>
-                                    )}
-
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 2 }}>
-                                        <span style={{ fontWeight: 600, color: '#e2e8f0', whiteSpace: 'nowrap' }}>{opp.name}</span>
-                                        <span style={{ color: '#38bdf8' }}>{opp.progress || 0}%</span>
-                                    </div>
-                                    <div style={{ width: '100%', height: 3, background: '#0f172a', borderRadius: 2, overflow: 'hidden' }}>
-                                        <div
-                                            style={{
-                                                width: `${opp.progress || 0}%`,
-                                                height: '100%',
-                                                background: '#38bdf8',
-                                                transition: 'width 0.2s ease'
-                                            }}
-                                        />
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
-            </div>
-
-            {/* 2. Игровое поле (Карусель: поворот на 180°) */}
+            {/* Игровое поле */}
             <div
                 ref={boardRef}
                 style={{
@@ -1470,8 +667,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                             ? 'chaosShake 0.25s infinite'
                             : hasEvent('CAROUSEL')
                                 ? 'orbitalDrift 4.5s ease-in-out infinite'
-                                : 'none',
-                    transition: 'none'
+                                : 'none'
                 }}
             >
                 {boardCells.map((row, r) =>
@@ -1511,7 +707,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                                             ? ghostColor
                                             : '#ef4444'
                                         : isGhostMode && cell.color
-                                            ? 'rgba(15, 23, 42, 0.55)' // Во время призраков сливается с фоном пустых клеток!
+                                            ? 'rgba(15, 23, 42, 0.55)'
                                             : cell.color || 'rgba(15, 23, 42, 0.55)',
                                     opacity: isGhostCell
                                         ? isGhostValid
@@ -1523,7 +719,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                                             ? `2px solid ${ghostColor}`
                                             : '2px solid #ef4444'
                                         : isGhostMode
-                                            ? '1px dashed #334155' // Маскируется под серый пунктир пустых клеток!
+                                            ? '1px dashed #334155'
                                             : cell.color
                                                 ? 'none'
                                                 : '1px dashed #334155',
@@ -1536,7 +732,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                 )}
             </div>
 
-            {/* 3. Лоток фигур (Туман войны: маскировка под ❓) */}
+            {/* Лоток фигур */}
             <div
                 style={{
                     width: '100%',
@@ -1706,147 +902,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                 })}
             </div>
 
-            {/* 4. Фонарик */}
-            {hasEvent('FLASHLIGHT') && !roundResults && (
-                <div
-                    style={{
-                        position: 'fixed',
-                        inset: 0,
-                        zIndex: 7000,
-                        pointerEvents: 'none',
-                        background: `radial-gradient(circle 115px at ${lightPos.x}px ${lightPos.y}px, rgba(15, 23, 42, 0) 0%, rgba(15, 23, 42, 0.15) 55%, rgba(6, 10, 20, 0.93) 100%)`
-                    }}
-                />
-            )}
-
-            {/* 5. Свап досок */}
-            {swapBanner && (
-                <div
-                    style={{
-                        position: 'fixed',
-                        inset: 0,
-                        zIndex: 9500,
-                        pointerEvents: 'none',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        background: 'radial-gradient(circle, rgba(16, 185, 129, 0.28) 0%, rgba(15, 23, 42, 0) 70%)'
-                    }}
-                >
-                    <div
-                        style={{
-                            position: 'absolute',
-                            left: '50%',
-                            top: '50%',
-                            width: 220,
-                            height: 220,
-                            borderRadius: '50%',
-                            border: '4px solid #10b981',
-                            animation: 'swapPortalPulse 1.1s ease-out infinite'
-                        }}
-                    />
-                    <div
-                        style={{
-                            background: 'rgba(15, 23, 42, 0.95)',
-                            border: '2px solid #10b981',
-                            borderRadius: 20,
-                            padding: '16px 24px',
-                            textAlign: 'center',
-                            boxShadow: '0 0 40px rgba(16, 185, 129, 0.6)',
-                            transform: 'scale(1.05)'
-                        }}
-                    >
-                        <div style={{ fontSize: 38, marginBottom: 4 }}>🌀</div>
-                        <div style={{ fontSize: 20, fontWeight: 900, color: '#10b981', letterSpacing: 1 }}>
-                            СВАП ДОСОК!
-                        </div>
-                        <div style={{ fontSize: 13, color: '#e2e8f0', marginTop: 4, fontWeight: 600 }}>
-                            Вы получили поле игрока <span style={{ color: '#38bdf8' }}>«{swapBanner.fromName}»</span>!
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* 6. Кляксы краски */}
-            {paintSplats.length > 0 && (
-                <div
-                    onPointerDown={(e) => {
-                        lastWipePosRef.current = { x: e.clientX, y: e.clientY };
-                    }}
-                    onPointerMove={(e) => wipePaintAt(e.clientX, e.clientY)}
-                    onPointerUp={() => {
-                        lastWipePosRef.current = null;
-                    }}
-                    style={{
-                        position: 'fixed',
-                        inset: 0,
-                        zIndex: 8000,
-                        touchAction: 'none',
-                        cursor: 'crosshair'
-                    }}
-                >
-                    <div
-                        style={{
-                            position: 'fixed',
-                            top: '18%',
-                            left: '50%',
-                            transform: 'translateX(-50%)',
-                            background: 'rgba(15, 23, 42, 0.92)',
-                            color: '#ec4899',
-                            padding: '7px 16px',
-                            borderRadius: 20,
-                            fontWeight: 800,
-                            fontSize: 13,
-                            border: '1px solid #ec4899',
-                            pointerEvents: 'none',
-                            whiteSpace: 'nowrap',
-                            boxShadow: '0 4px 15px rgba(0,0,0,0.4)'
-                        }}
-                    >
-                        🧽 Три кляксы пальцем ({paintSplats.length} шт.)!
-                    </div>
-
-                    {paintSplats.map((splat) => (
-                        <div
-                            key={splat.id}
-                            style={{
-                                position: 'fixed',
-                                left: splat.x,
-                                top: splat.y,
-                                width: splat.size,
-                                height: splat.size,
-                                transform: `translate(-50%, -50%) scale(${0.35 + (splat.hp / 100) * 0.65})`,
-                                opacity: Math.max(0.4, splat.hp / 100),
-                                pointerEvents: 'none',
-                                filter: 'drop-shadow(0 6px 14px rgba(0,0,0,0.5))',
-                                transition: 'transform 0.08s ease-out, opacity 0.08s ease-out'
-                            }}
-                        >
-                            <svg viewBox="0 0 100 100" width="100%" height="100%">
-                                {/* Центральная сочная клякса */}
-                                <path
-                                    d="M 50,15 C 68,12 85,28 82,46 C 88,62 76,82 58,84 C 42,86 26,78 18,65 C 10,48 18,28 32,20 C 38,16 44,18 50,15 Z"
-                                    fill={splat.color}
-                                />
-                                {/* Брызги-капли вокруг */}
-                                <circle cx="86" cy="24" r="5" fill={splat.color} />
-                                <circle cx="16" cy="26" r="4.5" fill={splat.color} />
-                                <circle cx="14" cy="74" r="6" fill={splat.color} />
-                                <circle cx="78" cy="78" r="5.5" fill={splat.color} />
-                                <circle cx="52" cy="92" r="4" fill={splat.color} />
-                                <circle cx="48" cy="8" r="3.5" fill={splat.color} />
-                                {/* Глянцевый блик света */}
-                                <path
-                                    d="M 34,28 C 42,24 54,24 62,30 C 58,35 46,33 36,36 Z"
-                                    fill="rgba(255, 255, 255, 0.42)"
-                                />
-                            </svg>
-                        </div>
-                    ))}
-                </div>
-            )}
-
-            {/* 7. Летающая фигура под пальцем (Карусель: поворот на 180°) */}
+            {/* Летающая деталь под пальцем */}
             {draggedPiece && dragPos && !roundResults && (
                 <div
                     style={{
@@ -1880,281 +936,39 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                 </div>
             )}
 
-            {/* 8. Подтверждение выхода */}
+            {/* Модалка подтверждения выхода */}
             {showExitConfirm && (
-                <div
-                    style={{
-                        position: 'fixed',
-                        inset: 0,
-                        background: 'rgba(15, 23, 42, 0.85)',
-                        backdropFilter: 'blur(5px)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        zIndex: 10002,
-                        padding: 20
+                <ExitConfirmModal
+                    onCancel={() => setShowExitConfirm(false)}
+                    onConfirm={() => {
+                        setShowExitConfirm(false);
+                        socket.emit('back_to_lobby', { code: roomCode });
                     }}
-                >
-                    <div
-                        style={{
-                            background: '#1e293b',
-                            border: '1px solid #334155',
-                            borderRadius: 16,
-                            padding: 20,
-                            maxWidth: 320,
-                            width: '100%',
-                            textAlign: 'center',
-                            boxShadow: '0 10px 30px rgba(0,0,0,0.5)'
-                        }}
-                    >
-                        <div style={{ fontSize: 36, marginBottom: 8 }}>🚪</div>
-                        <h3 style={{ fontSize: 18, color: '#f8fafc', marginBottom: 6, fontWeight: 700 }}>
-                            Покинуть матч?
-                        </h3>
-                        <p style={{ fontSize: 13, color: '#94a3b8', marginBottom: 18, lineHeight: 1.4 }}>
-                            Текущий прогресс раунда будет сброшен, и комната вернется в лобби ожидания.
-                        </p>
-                        <div style={{ display: 'flex', gap: 10 }}>
-                            <button
-                                onClick={() => setShowExitConfirm(false)}
-                                style={{
-                                    flex: 1,
-                                    padding: 12,
-                                    borderRadius: 10,
-                                    background: '#334155',
-                                    color: '#fff',
-                                    border: 'none',
-                                    fontSize: 14,
-                                    fontWeight: 600,
-                                    cursor: 'pointer'
-                                }}
-                            >
-                                Отмена
-                            </button>
-                            <button
-                                onClick={() => {
-                                    setShowExitConfirm(false);
-                                    socket.emit('back_to_lobby', { code: roomCode });
-                                }}
-                                style={{
-                                    flex: 1,
-                                    padding: 12,
-                                    borderRadius: 10,
-                                    background: '#e11d48',
-                                    color: '#fff',
-                                    border: 'none',
-                                    fontSize: 14,
-                                    fontWeight: 600,
-                                    cursor: 'pointer'
-                                }}
-                            >
-                                Да, выйти
-                            </button>
-                        </div>
-                    </div>
-                </div>
+                />
             )}
 
-            {/* 9. Экран результатов */}
+            {/* Модалка победы / результатов раунда */}
             {roundResults && roundWinner && (
-                <div
-                    style={{
-                        position: 'fixed',
-                        inset: 0,
-                        background: 'rgba(15, 23, 42, 0.96)',
-                        backdropFilter: 'blur(8px)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        zIndex: 10001,
-                        padding: 16,
-                        overflowY: 'auto'
+                <GameOverModal
+                    roundWinner={roundWinner}
+                    roundResults={roundResults}
+                    myId={myId}
+                    isHost={isHost}
+                    solutionGrid={level.solutionGrid}
+                    gridWidth={level.gridWidth}
+                    gridHeight={level.gridHeight}
+                    solCellSize={SOL_CELL_SIZE}
+                    onNextRound={() => {
+                        setRoundResults(null);
+                        setRoundWinner(null);
+                        socket.emit('start_game', {
+                            code: roomCode,
+                            width: level.gridWidth,
+                            height: level.gridHeight
+                        });
                     }}
-                >
-                    <div style={{ width: '100%', maxWidth: 380, textAlign: 'center', margin: 'auto' }}>
-                        <div style={{ fontSize: 38, marginBottom: 4 }}>
-                            {roundWinner.isAborted ? '🏳️' : roundWinner.id === myId ? '🏆' : '⚡'}
-                        </div>
-
-                        <h1
-                            style={{
-                                fontSize: 22,
-                                fontWeight: 900,
-                                color: roundWinner.isAborted
-                                    ? '#cbd5e1'
-                                    : roundWinner.id === myId
-                                        ? '#38bdf8'
-                                        : '#f59e0b',
-                                marginBottom: 2
-                            }}
-                        >
-                            {roundWinner.isAborted
-                                ? 'РАУНД ЗАВЕРШЕН ДОСРОЧНО'
-                                : roundWinner.id === myId
-                                    ? 'ВЫ ПОБЕДИЛИ!'
-                                    : `${roundWinner.name} собрал быстрее всех!`}
-                        </h1>
-
-                        <p style={{ color: '#94a3b8', fontSize: 12, marginBottom: 14 }}>
-                            {roundWinner.isAborted
-                                ? 'Все игроки проголосовали за пропуск — без начисления очков'
-                                : 'Счет серии (число побед)'}
-                        </p>
-
-                        {level.solutionGrid && (
-                            <div
-                                style={{
-                                    background: '#0b1329',
-                                    border: '1px solid #334155',
-                                    borderRadius: 12,
-                                    padding: '10px 14px',
-                                    marginBottom: 14,
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    alignItems: 'center',
-                                    boxShadow: '0 4px 16px rgba(0,0,0,0.3)'
-                                }}
-                            >
-                                <div
-                                    style={{
-                                        fontSize: 12,
-                                        fontWeight: 700,
-                                        color: '#94a3b8',
-                                        marginBottom: 8,
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: 6
-                                    }}
-                                >
-                                    <span>🧩</span> Как надо было собрать:
-                                </div>
-
-                                <div
-                                    style={{
-                                        display: 'grid',
-                                        gridTemplateColumns: `repeat(${level.gridWidth}, ${SOL_CELL_SIZE}px)`,
-                                        gridTemplateRows: `repeat(${level.gridHeight}, ${SOL_CELL_SIZE}px)`,
-                                        gap: '3px',
-                                        background: '#1e293b',
-                                        padding: 6,
-                                        borderRadius: 10,
-                                        border: '1px solid #334155'
-                                    }}
-                                >
-                                    {level.solutionGrid.map((row, r) =>
-                                        row.map((cellColor, c) => (
-                                            <div
-                                                key={`${r}-${c}`}
-                                                style={{
-                                                    width: SOL_CELL_SIZE,
-                                                    height: SOL_CELL_SIZE,
-                                                    borderRadius: 4,
-                                                    background: cellColor || '#0f172a',
-                                                    boxShadow: 'inset 0 0 4px rgba(0,0,0,0.4)',
-                                                    border: '1px solid rgba(255,255,255,0.06)'
-                                                }}
-                                            />
-                                        ))
-                                    )}
-                                </div>
-                            </div>
-                        )}
-
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
-                            {roundResults.map((player, index) => {
-                                const medals = ['🥇', '🥈', '🥉'];
-                                const isRoundWinner = !roundWinner.isAborted && player.id === roundWinner.id;
-
-                                return (
-                                    <div
-                                        key={player.id}
-                                        style={{
-                                            background: isRoundWinner
-                                                ? 'rgba(56, 189, 248, 0.15)'
-                                                : player.id === myId
-                                                    ? '#1e293b'
-                                                    : '#0f172a',
-                                            border: isRoundWinner ? '2px solid #38bdf8' : '1px solid #334155',
-                                            borderRadius: 10,
-                                            padding: '8px 12px',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'space-between'
-                                        }}
-                                    >
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                            <span style={{ fontSize: 16 }}>{medals[index] || `#${index + 1}`}</span>
-                                            <span style={{ fontWeight: 600, fontSize: 14 }}>
-                                                {player.name} {player.id === myId ? '(Вы)' : ''}
-                                            </span>
-                                        </div>
-                                        <div>
-                                            <span style={{ fontWeight: 900, fontSize: 16, color: '#38bdf8' }}>
-                                                {player.score || 0}
-                                            </span>
-                                            <span style={{ fontSize: 11, color: '#64748b', marginLeft: 4 }}>
-                                                {(player.score || 0) === 1
-                                                    ? 'победа'
-                                                    : (player.score || 0) >= 2 && (player.score || 0) <= 4
-                                                        ? 'победы'
-                                                        : 'побед'}
-                                            </span>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-
-                        {isHost ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
-                                <button
-                                    onClick={() => {
-                                        setRoundResults(null);
-                                        setRoundWinner(null);
-                                        socket.emit('start_game', {
-                                            code: roomCode,
-                                            width: level.gridWidth,
-                                            height: level.gridHeight
-                                        });
-                                    }}
-                                    style={{
-                                        padding: 12,
-                                        borderRadius: 12,
-                                        background: '#e11d48',
-                                        color: '#fff',
-                                        border: 'none',
-                                        fontWeight: 'bold',
-                                        fontSize: 15,
-                                        cursor: 'pointer'
-                                    }}
-                                >
-                                    Следующий раунд ({level.gridWidth}×{level.gridHeight}) →
-                                </button>
-
-                                <button
-                                    onClick={() => socket.emit('back_to_lobby', { code: roomCode })}
-                                    style={{
-                                        padding: 10,
-                                        borderRadius: 12,
-                                        background: '#1e293b',
-                                        color: '#38bdf8',
-                                        border: '1px solid #38bdf8',
-                                        fontWeight: 'bold',
-                                        fontSize: 13,
-                                        cursor: 'pointer'
-                                    }}
-                                >
-                                    В лобби (настройки / позвать друзей) 👥
-                                </button>
-                            </div>
-                        ) : (
-                            <p style={{ color: '#94a3b8', fontStyle: 'italic', fontSize: 13 }}>
-                                Ожидаем решение создателя комнаты...
-                            </p>
-                        )}
-                    </div>
-                </div>
+                    onBackToLobby={() => socket.emit('back_to_lobby', { code: roomCode })}
+                />
             )}
         </div>
     );
