@@ -776,6 +776,19 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                         filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.8));
                     }
                 }
+                @keyframes xrayBlinkTwice {
+                    0% { opacity: 0; }
+                    18% { opacity: 0.45; }
+                    36% { opacity: 0.45; }
+                    50% { opacity: 0; }
+                    68% { opacity: 0.45; }
+                    86% { opacity: 0.45; }
+                    100% { opacity: 0; }
+                }
+                @keyframes jokerGoldPulse {
+                    0%, 100% { box-shadow: 0 0 10px rgba(245, 158, 11, 0.4); border-color: #f59e0b; }
+                    50% { box-shadow: 0 0 22px rgba(245, 158, 11, 0.9); border-color: #fde047; }
+                }
                 @keyframes alertPulse {
                     0% { transform: translate(-50%, -10px) scale(0.9); opacity: 0; }
                     15% { transform: translate(-50%, 0) scale(1.05); opacity: 1; }
@@ -942,6 +955,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                                     if (cell.shape) handleStartDrag(cell.shape, e);
                                 }}
                                 style={{
+                                    position: 'relative',
                                     width: CELL_SIZE,
                                     height: CELL_SIZE,
                                     borderRadius: 8,
@@ -949,11 +963,9 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                                         ? isGhostValid
                                             ? ghostColor
                                             : '#ef4444'
-                                        : isXrayCell
-                                            ? `${solColor}33` // Полупрозрачная подсветка правильного цвета Рентгена
-                                            : isGhostMode && cell.color
-                                                ? 'rgba(148, 163, 184, 0.14)'
-                                                : cell.color || 'rgba(15, 23, 42, 0.55)',
+                                        : isGhostMode && cell.color
+                                            ? 'rgba(148, 163, 184, 0.14)'
+                                            : cell.color || 'rgba(15, 23, 42, 0.55)',
                                     opacity: isGhostCell
                                         ? isGhostValid
                                             ? 0.45
@@ -963,17 +975,30 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                                         ? isGhostValid
                                             ? `2px solid ${ghostColor}`
                                             : '2px solid #ef4444'
-                                        : isXrayCell
-                                            ? `1.5px dashed ${solColor}` // Пунктирный контур нужной детали
-                                            : isGhostMode && cell.color
-                                                ? '1.5px dashed rgba(226, 232, 240, 0.65)'
-                                                : cell.color
-                                                    ? 'none'
-                                                    : '1px dashed #334155',
+                                        : isGhostMode && cell.color
+                                            ? '1.5px dashed rgba(226, 232, 240, 0.65)'
+                                            : cell.color
+                                                ? 'none'
+                                                : '1px dashed #334155',
                                     cursor: cell.shape ? 'grab' : 'default',
                                     transition: 'background 0.05s ease, opacity 0.25s ease'
                                 }}
-                            />
+                            >
+                                {/* Рентген: мягко мигает ровно 2 раза поверх пустой клетки */}
+                                {isXrayCell && (
+                                    <div
+                                        style={{
+                                            position: 'absolute',
+                                            inset: 0,
+                                            borderRadius: 8,
+                                            background: `${solColor}22`,
+                                            border: `1.5px dashed ${solColor}99`,
+                                            animation: 'xrayBlinkTwice 2.2s ease-in-out forwards',
+                                            pointerEvents: 'none'
+                                        }}
+                                    />
+                                )}
+                            </div>
                         );
                     })
                 )}
@@ -1018,6 +1043,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                     const iceHitsLeft = frozenPieces[piece.id] || 0;
                     const isFrozen = iceHitsLeft > 0;
                     const isFogged = hasEvent('FOG');
+                    const isJokerPiece = hasEvent('JOKER') && piece.id === trayPieces[0]?.id;
 
                     return (
                         <div
@@ -1030,11 +1056,14 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                                     : isFogged
                                         ? 'rgba(30, 41, 59, 0.85)'
                                         : 'rgba(30, 41, 59, 0.70)',
-                                border: isFrozen
-                                    ? '2px solid #22d3ee'
-                                    : isFogged
-                                        ? '1px dashed #64748b'
-                                        : '1px solid #334155',
+                                border: isJokerPiece
+                                    ? '2px solid #fbbf24'
+                                    : isFrozen
+                                        ? '2px solid #22d3ee'
+                                        : isFogged
+                                            ? '1px dashed #64748b'
+                                            : '1px solid #334155',
+                                animation: isJokerPiece ? 'jokerGoldPulse 1.2s infinite' : 'none',
                                 boxShadow: isFrozen
                                     ? '0 0 12px rgba(34, 211, 238, 0.35)'
                                     : isFogged
@@ -1068,6 +1097,27 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                                     }}
                                 >
                                     ❄️ {iceHitsLeft}
+                                </div>
+                            )}
+
+                            {isJokerPiece && (
+                                <div
+                                    style={{
+                                        position: 'absolute',
+                                        top: 4,
+                                        right: 4,
+                                        background: '#f59e0b',
+                                        color: '#0f172a',
+                                        fontSize: 9,
+                                        fontWeight: 900,
+                                        padding: '1px 6px',
+                                        borderRadius: 999,
+                                        zIndex: 5,
+                                        pointerEvents: 'none',
+                                        boxShadow: '0 2px 8px rgba(245, 158, 11, 0.6)'
+                                    }}
+                                >
+                                    ⭐ ДЖОКЕР
                                 </div>
                             )}
 
@@ -1221,28 +1271,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                     onBackToLobby={() => socket.emit('back_to_lobby', { code: roomCode })}
                 />
             )}
-            {/* Верхняя интерфейсная панель */}
-            <GameTopBar
-                roomCode={roomCode}
-                isHost={isHost}
-                isMuted={isMuted}
-                onToggleMute={() => {
-                    sfx.muted = !sfx.muted;
-                    setIsMuted(sfx.muted);
-                }}
-                onExitClick={() => setShowExitConfirm(true)}
-                endRoundVotes={endRoundVotes}
-                totalRoomPlayers={totalRoomPlayers}
-                hasVotedEndRound={endRoundVotes.includes(myId)}
-                onVoteEndRound={() => socket.emit('vote_end_round', { code: roomCode })}
-                activeEvents={activeEvents}
-                eventCountdown={eventCountdown}
-                cycleCount={cycleCountRef.current}
-                opponents={opponents}
-                luckyOverrides={luckyOverrides}
-                playerReactions={playerReactions}
-                onSendReaction={(emoji) => socket.emit('send_reaction', { code: roomCode, emoji, playerId: myId })}
-            />
         </div>
     );
 };

@@ -122,34 +122,59 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                     border: '1px solid rgba(255, 255, 255, 0.14)'
                 }}
             >
-                {/* Кнопка "Гайд" в правом верхнем углу */}
-                <button
-                    type="button"
-                    className="guide-btn"
-                    onClick={() => setShowGuide(true)}
+                {/* Версия игры и Кнопка "Гайд" в правом верхнем углу */}
+                <div
                     style={{
                         position: 'absolute',
                         top: 14,
                         right: 14,
-                        background: 'rgba(30, 41, 59, 0.75)',
-                        border: '1px solid rgba(255, 255, 255, 0.18)',
-                        color: '#cbd5e1',
-                        borderRadius: 10,
-                        padding: '5px 10px',
-                        fontSize: 12,
-                        fontWeight: 700,
-                        cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: 4,
-                        zIndex: 10,
-                        backdropFilter: 'blur(8px)',
-                        WebkitBackdropFilter: 'blur(8px)',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
+                        gap: 8,
+                        zIndex: 10
                     }}
                 >
-                    <span>📖</span> Гайд
-                </button>
+                    <span
+                        style={{
+                            fontSize: 11,
+                            fontWeight: 800,
+                            color: '#38bdf8',
+                            background: 'rgba(15, 23, 42, 0.75)',
+                            padding: '4px 8px',
+                            borderRadius: 8,
+                            border: '1px solid rgba(56, 189, 248, 0.3)',
+                            letterSpacing: 0.5,
+                            backdropFilter: 'blur(8px)',
+                            WebkitBackdropFilter: 'blur(8px)'
+                        }}
+                    >
+                        v2.2
+                    </span>
+
+                    <button
+                        type="button"
+                        className="guide-btn"
+                        onClick={() => setShowGuide(true)}
+                        style={{
+                            background: 'rgba(30, 41, 59, 0.75)',
+                            border: '1px solid rgba(255, 255, 255, 0.18)',
+                            color: '#cbd5e1',
+                            borderRadius: 10,
+                            padding: '5px 10px',
+                            fontSize: 12,
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            backdropFilter: 'blur(8px)',
+                            WebkitBackdropFilter: 'blur(8px)',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
+                        }}
+                    >
+                        <span>📖</span> Гайд
+                    </button>
+                </div>
 
                 {!room ? (
                     <div>
