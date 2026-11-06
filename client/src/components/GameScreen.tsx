@@ -85,6 +85,18 @@ export const GameScreen: React.FC<GameScreenProps> = ({
     const [recentReaction, setRecentReaction] = useState<{ emoji: string; name: string } | null>(null);
     const [trayShift, setTrayShift] = useState<number>(0);
 
+    // Состояния для срыва детали во время землетрясения
+    const [fallingPiece, setFallingPiece] = useState<{
+        id: string;
+        matrix: number[][];
+        color: string;
+        startX: number;
+        startY: number;
+        key: number;
+    } | null>(null);
+    const [earthquakeAlert, setEarthquakeAlert] = useState<string | null>(null);
+    const earthquakeDropsTriggeredRef = useRef<{ second2: boolean; second8: boolean }>({ second2: false, second8: false });
+
     const dragStartPointerRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
     const dragStartPiecePosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
     const lastWipePosRef = useRef<{ x: number; y: number } | null>(null);
@@ -108,6 +120,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
     const activateChaosEventsLocally = (eventsList: ChaosEvent[]) => {
         setActiveEvents(eventsList);
         eventsList.forEach((ev) => sfx.playEvent(ev));
+        earthquakeDropsTriggeredRef.current = { second2: false, second8: false };
 
         if (eventsList.includes('PAINT')) {
             spawnPaintSplats();
@@ -224,6 +237,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
         setPaintSplats(newSplats);
     };
 
+    // Таймер раунда
     useEffect(() => {
         if (roundResults) return;
 
@@ -272,7 +286,73 @@ export const GameScreen: React.FC<GameScreenProps> = ({
         return () => clearInterval(timer);
     }, [roundResults, isHost, roomCode, players]);
 
-    // Сдвиг конвейера лотка каждые 2.5 сек во время Мегакарусели
+    // Механика землетрясения: срыв фигуры на 2-й и 8-й секунде
+    const triggerEarthquakeDrop = () => {
+        const placed = piecesRef.current.filter((p) => p.row !== null && p.col !== null);
+        if (placed.length === 0) return;
+
+        // Выбираем случайную фигуру с поля
+        const pieceToDrop = placed[Math.floor(Math.random() * placed.length)];
+
+        // Точные координаты на экране для анимации падения
+        if (boardRef.current) {
+            const boardRect = boardRef.current.getBoundingClientRect();
+            const startX = boardRect.left + 10 + pieceToDrop.col! * STEP;
+            const startY = boardRect.top + 10 + pieceToDrop.row! * STEP;
+
+            setFallingPiece({
+                id: pieceToDrop.id,
+                matrix: pieceToDrop.matrix,
+                color: pieceToDrop.color,
+                startX,
+                startY,
+                key: Date.now()
+            });
+
+            setTimeout(() => {
+                setFallingPiece(null);
+            }, 850);
+        }
+
+        // Если фигура перетаскивалась прямо сейчас — отпускаем её
+        if (draggedPieceRef.current?.id === pieceToDrop.id) {
+            setDraggedId(null);
+            setDragPos(null);
+        }
+
+        // Возвращаем деталь в лоток
+        const updated = piecesRef.current.map((p) =>
+            p.id === pieceToDrop.id ? { ...p, row: null, col: null } : p
+        );
+        setPieces(updated);
+        updateTotalProgress(updated);
+
+        // Звук удара, вибрация и плашка
+        sfx.playEarthquakeDrop();
+        if ('vibrate' in navigator) {
+            navigator.vibrate([40, 30, 80]);
+        }
+
+        setEarthquakeAlert('🌋 Тряска сбила фигуру в лоток!');
+        setTimeout(() => {
+            setEarthquakeAlert(null);
+        }, 2200);
+    };
+
+    // Отслеживание 2-й (countdown = 8) и 8-й (countdown = 2) секунды землетрясения
+    useEffect(() => {
+        if (!hasEvent('EARTHQUAKE') || roundResults) return;
+
+        if (eventCountdown === 8 && !earthquakeDropsTriggeredRef.current.second2) {
+            earthquakeDropsTriggeredRef.current.second2 = true;
+            triggerEarthquakeDrop();
+        } else if (eventCountdown === 2 && !earthquakeDropsTriggeredRef.current.second8) {
+            earthquakeDropsTriggeredRef.current.second8 = true;
+            triggerEarthquakeDrop();
+        }
+    }, [eventCountdown, activeEvents, roundResults]);
+
+    // Сдвиг лотка каждые 2.5 сек во время Мегакарусели
     useEffect(() => {
         if (!hasEvent('CAROUSEL') || roundResults) {
             setTrayShift(0);
@@ -586,6 +666,10 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                     75% { transform: translate(-26px, -18px); }
                     100% { transform: translate(0px, 0px); }
                 }
+                @keyframes conveyorTick {
+                    0% { transform: scale(0.94); opacity: 0.7; }
+                    100% { transform: scale(1); opacity: 1; }
+                }
                 @keyframes swapBoard3D {
                     0% { transform: perspective(700px) rotateY(0deg) scale(1); filter: brightness(1); }
                     45% { transform: perspective(700px) rotateY(180deg) scale(0.65); filter: brightness(2.2) hue-rotate(90deg); }
@@ -601,12 +685,35 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                     80% { transform: translateY(-16px) scale(1); opacity: 1; }
                     100% { transform: translateY(-24px) scale(0.8); opacity: 0; }
                 }
+                @keyframes pieceTumbleFall {
+                    0% {
+                        transform: translate(0, 0) rotate(0deg) scale(1);
+                        opacity: 1;
+                        filter: drop-shadow(0 0 16px rgba(239, 68, 68, 0.9));
+                    }
+                    15% {
+                        transform: translate(-10px, -15px) rotate(-10deg) scale(1.08);
+                        opacity: 1;
+                        filter: drop-shadow(0 0 22px rgba(239, 68, 68, 1));
+                    }
+                    100% {
+                        transform: translate(25px, 280px) rotate(42deg) scale(0.6);
+                        opacity: 0;
+                        filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.8));
+                    }
+                }
+                @keyframes alertPulse {
+                    0% { transform: translate(-50%, -10px) scale(0.9); opacity: 0; }
+                    15% { transform: translate(-50%, 0) scale(1.05); opacity: 1; }
+                    85% { transform: translate(-50%, 0) scale(1); opacity: 1; }
+                    100% { transform: translate(-50%, -15px) scale(0.9); opacity: 0; }
+                }
             `}</style>
 
             {/* Фон Canvas */}
             <SpaceCanvasBackground celebrate={Boolean(roundWinner && !roundWinner.isAborted)} />
 
-            {/* Оверлеи хаоса: кляксы, фонарик, свап, всплывающее эмодзи */}
+            {/* Оверлеи хаоса */}
             <ChaosOverlays
                 hasEvent={hasEvent}
                 roundFinished={Boolean(roundResults)}
@@ -616,6 +723,66 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                 onWipePaint={wipePaintAt}
                 recentReaction={recentReaction}
             />
+
+            {/* Анимированная фигура, слетающая с доски от землетрясения */}
+            {fallingPiece && (
+                <div
+                    key={fallingPiece.key}
+                    style={{
+                        position: 'fixed',
+                        left: fallingPiece.startX,
+                        top: fallingPiece.startY,
+                        pointerEvents: 'none',
+                        zIndex: 9998,
+                        display: 'grid',
+                        gridTemplateColumns: `repeat(${fallingPiece.matrix[0].length}, ${CELL_SIZE}px)`,
+                        gap: `${CELL_GAP}px`,
+                        animation: 'pieceTumbleFall 0.85s cubic-bezier(0.25, 1, 0.5, 1) forwards'
+                    }}
+                >
+                    {fallingPiece.matrix.map((row, r) =>
+                        row.map((val, c) => (
+                            <div
+                                key={`${r}-${c}`}
+                                style={{
+                                    width: CELL_SIZE,
+                                    height: CELL_SIZE,
+                                    borderRadius: 8,
+                                    background: val ? fallingPiece.color : 'transparent',
+                                    border: val ? '2px solid #ef4444' : 'none',
+                                    boxShadow: val ? '0 0 16px rgba(239, 68, 68, 0.85)' : 'none'
+                                }}
+                            />
+                        ))
+                    )}
+                </div>
+            )}
+
+            {/* Всплывающее предупреждение землетрясения */}
+            {earthquakeAlert && (
+                <div
+                    style={{
+                        position: 'fixed',
+                        top: '22%',
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        background: 'rgba(239, 68, 68, 0.95)',
+                        border: '2px solid #fca5a5',
+                        color: '#fff',
+                        padding: '7px 18px',
+                        borderRadius: 20,
+                        fontSize: 13,
+                        fontWeight: 800,
+                        zIndex: 10004,
+                        pointerEvents: 'none',
+                        whiteSpace: 'nowrap',
+                        boxShadow: '0 4px 20px rgba(239, 68, 68, 0.6)',
+                        animation: 'alertPulse 2.2s ease forwards'
+                    }}
+                >
+                    {earthquakeAlert}
+                </div>
+            )}
 
             {/* Верхняя интерфейсная панель */}
             <GameTopBar
@@ -639,7 +806,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                 onSendReaction={(emoji) => socket.emit('send_reaction', { code: roomCode, emoji, playerId: myId })}
             />
 
-            {/* Игровое поле */}
+            {/* Игровое поле: четкий пунктирный контур для призраков */}
             <div
                 ref={boardRef}
                 style={{
@@ -707,7 +874,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                                             ? ghostColor
                                             : '#ef4444'
                                         : isGhostMode && cell.color
-                                            ? 'rgba(15, 23, 42, 0.55)'
+                                            ? 'rgba(148, 163, 184, 0.14)' // Легкая полупрозрачная дымка
                                             : cell.color || 'rgba(15, 23, 42, 0.55)',
                                     opacity: isGhostCell
                                         ? isGhostValid
@@ -718,8 +885,8 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                                         ? isGhostValid
                                             ? `2px solid ${ghostColor}`
                                             : '2px solid #ef4444'
-                                        : isGhostMode
-                                            ? '1px dashed #334155'
+                                        : isGhostMode && cell.color
+                                            ? '1.5px dashed rgba(226, 232, 240, 0.65)' // Четкий читаемый пунктир
                                             : cell.color
                                                 ? 'none'
                                                 : '1px dashed #334155',
@@ -856,7 +1023,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                                             gridTemplateRows: `repeat(${piece.matrix.length}, ${PREVIEW_CELL}px)`,
                                             gap: `${PREVIEW_GAP}px`,
                                             pointerEvents: 'none',
-                                            opacity: isGhostMode ? 0.07 : isFrozen ? 0.65 : 1,
+                                            opacity: isFrozen ? 0.65 : 1,
                                             filter: isFrozen ? 'saturate(0.4) brightness(1.3)' : 'none'
                                         }}
                                     >
@@ -868,8 +1035,12 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                                                         width: PREVIEW_CELL,
                                                         height: PREVIEW_CELL,
                                                         borderRadius: 3,
-                                                        background: val ? pieceColor : 'transparent',
-                                                        border: val && isGhostMode ? '1px dashed rgba(255,255,255,0.45)' : 'none'
+                                                        background: val
+                                                            ? isGhostMode
+                                                                ? 'rgba(148, 163, 184, 0.25)'
+                                                                : pieceColor
+                                                            : 'transparent',
+                                                        border: val && isGhostMode ? '1px dashed rgba(226, 232, 240, 0.7)' : 'none'
                                                     }}
                                                 />
                                             ))
@@ -927,8 +1098,8 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                                     height: CELL_SIZE,
                                     borderRadius: 8,
                                     background: val ? getDisplayColor(draggedPiece.color) : 'transparent',
-                                    opacity: val ? (isGhostMode ? 0.35 : 0.95) : 0,
-                                    border: val && isGhostMode ? '1px dashed #fff' : 'none'
+                                    opacity: val ? (isGhostMode ? 0.6 : 0.95) : 0,
+                                    border: val && isGhostMode ? '1.5px dashed #fff' : 'none'
                                 }}
                             />
                         ))
@@ -947,7 +1118,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                 />
             )}
 
-            {/* Модалка победы / результатов раунда */}
+            {/* Модалка победы */}
             {roundResults && roundWinner && (
                 <GameOverModal
                     roundWinner={roundWinner}

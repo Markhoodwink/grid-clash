@@ -113,6 +113,38 @@ export class SoundFX {
         });
     }
 
+    playEarthquakeDrop() {
+        const ctx = this.getContext();
+        if (!ctx) return;
+        const now = ctx.currentTime;
+
+        // 1. Треск срыва детали с доски
+        const crack = ctx.createOscillator();
+        const crackGain = ctx.createGain();
+        crack.type = 'sawtooth';
+        crack.frequency.setValueAtTime(420, now);
+        crack.frequency.exponentialRampToValueAtTime(110, now + 0.2);
+        crackGain.gain.setValueAtTime(0.32, now);
+        crackGain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+        crack.connect(crackGain);
+        crackGain.connect(ctx.destination);
+        crack.start(now);
+        crack.stop(now + 0.22);
+
+        // 2. Глухой стук падения в лоток
+        const thud = ctx.createOscillator();
+        const thudGain = ctx.createGain();
+        thud.type = 'triangle';
+        thud.frequency.setValueAtTime(140, now + 0.16);
+        thud.frequency.exponentialRampToValueAtTime(32, now + 0.38);
+        thudGain.gain.setValueAtTime(0.42, now + 0.16);
+        thudGain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+        thud.connect(thudGain);
+        thudGain.connect(ctx.destination);
+        thud.start(now + 0.16);
+        thud.stop(now + 0.4);
+    }
+
     playSwapPortal() {
         const ctx = this.getContext();
         if (!ctx) return;

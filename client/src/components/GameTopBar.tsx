@@ -14,10 +14,10 @@ const EVENT_INFO: Record<ChaosEvent, { title: string; short: string; color: stri
     PAINT: { title: '🎨 КРАСКА! Быстро три кляксы пальцем!', short: '🎨 Кляксы', color: '#ec4899' },
     CAROUSEL: { title: '🎠 МЕГАКАРУСЕЛЬ! Поле дрейфует, лоток движется!', short: '🎠 Мегакарусель', color: '#f59e0b' },
     MONOCHROME: { title: '🎭 ХАМЕЛЕОН! Все фигуры одного цвета!', short: '🎭 Хамелеон', color: '#a855f7' },
-    EARTHQUAKE: { title: '🌋 ЗЕМЛЕТРЯСЕНИЕ! Держи экран!', short: '🌋 Землетрясение', color: '#ef4444' },
+    EARTHQUAKE: { title: '🌋 ЗЕМЛЕТРЯСЕНИЕ! Фигуры срываются от тряски!', short: '🌋 Землетрясение', color: '#ef4444' },
     FLASHLIGHT: { title: '🔦 ТЬМА! Подсвечивай поле пальцем!', short: '🔦 Тьма', color: '#eab308' },
     ICE: { title: '🧊 ЗАМОРОЗКА! Тапай по льду, чтобы разбить!', short: '🧊 Заморозка', color: '#06b6d4' },
-    GHOST: { title: '👀 ПРИЗРАКИ! Фигуры невидимы на доске!', short: '👀 Призраки', color: '#94a3b8' },
+    GHOST: { title: '👀 ПРИЗРАКИ! У фигур виден только легкий контур!', short: '👀 Призраки', color: '#94a3b8' },
     SWAP: { title: '🌀 СВАП ДОСОК! Обмен полями с соперником!', short: '🌀 Свап досок', color: '#10b981' },
     INVERT_X: { title: '🪞 ЗЕРКАЛО! Палец по горизонтали инвертирован!', short: '🪞 Зеркало X', color: '#f43f5e' },
     FOG: { title: '🌫️ ТУМАН ВОЙНЫ! Фигуры скрыты в лотке!', short: '🌫️ Туман войны', color: '#64748b' }
