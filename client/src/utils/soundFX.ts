@@ -9,7 +9,10 @@ export type ChaosEvent =
     | 'GHOST'
     | 'SWAP'
     | 'INVERT_X'
-    | 'FOG';
+    | 'FOG'
+    | 'TOTEM'
+    | 'XRAY'
+    | 'JOKER';
 
 export class SoundFX {
     private ctx: AudioContext | null = null;
@@ -143,6 +146,25 @@ export class SoundFX {
         thudGain.connect(ctx.destination);
         thud.start(now + 0.16);
         thud.stop(now + 0.4);
+    }
+
+    playBuff() {
+        const ctx = this.getContext();
+        if (!ctx) return;
+        const now = ctx.currentTime;
+        // Светлый восходящий мажорный аккорд (C - E - G - C)
+        [523.25, 659.25, 783.99, 1046.5].forEach((freq, i) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, now + i * 0.06);
+            gain.gain.setValueAtTime(0.22, now + i * 0.06);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.06 + 0.28);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now + i * 0.06);
+            osc.stop(now + i * 0.06 + 0.28);
+        });
     }
 
     playSwapPortal() {
@@ -281,6 +303,7 @@ export class SoundFX {
         else if (event === 'INVERT_X') this.playInvert();
         else if (event === 'FOG') this.playFog();
         else if (event === 'SWAP') this.playSwapPortal();
+        else if (event === 'TOTEM' || event === 'XRAY' || event === 'JOKER') this.playBuff();
         else if (event === 'ICE') {
             const ctx = this.getContext();
             if (!ctx) return;

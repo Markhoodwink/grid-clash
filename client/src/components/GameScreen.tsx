@@ -84,6 +84,8 @@ export const GameScreen: React.FC<GameScreenProps> = ({
     const [playerReactions, setPlayerReactions] = useState<Record<string, { emoji: string; ts: number }>>({});
     const [recentReaction, setRecentReaction] = useState<{ emoji: string; name: string } | null>(null);
     const [trayShift, setTrayShift] = useState<number>(0);
+    const [luckyOverrides, setLuckyOverrides] = useState<Record<string, ChaosEvent[]>>({});
+    const lastLuckyPlayersRef = useRef<string[]>([]);
 
     // Состояния для срыва детали во время землетрясения
     const [fallingPiece, setFallingPiece] = useState<{
@@ -158,10 +160,14 @@ export const GameScreen: React.FC<GameScreenProps> = ({
             );
         });
 
-        socket.on('chaos_event_triggered', ({ events, event }: { events?: ChaosEvent[]; event?: ChaosEvent }) => {
+        socket.on('chaos_event_triggered', ({ events, luckyOverrides: incomingLucky }: { events?: ChaosEvent[]; luckyOverrides?: Record<string, ChaosEvent[]> }) => {
             setEventCountdown(10);
-            const list = events || (event ? [event] : ['NONE']);
-            activateChaosEventsLocally(list);
+            const overrides = incomingLucky || {};
+            setLuckyOverrides(overrides);
+
+            // Если для меня выпал персональный бафф — применяем его вместо дебаффа!
+            const myList = overrides[myId] || events || ['NONE'];
+            activateChaosEventsLocally(myList);
         });
 
         socket.on('board_swapped', ({ pieces: newPieces, fromPlayerName }: { pieces: PlacedShape[]; progress: number; fromPlayerName: string }) => {
@@ -262,9 +268,17 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                     const playerCount = Object.keys(players).length;
                     const rollSwap = playerCount >= 2 && Math.random() < 0.15 && !prevEvents.includes('SWAP');
 
-                    if (rollSwap) {
+                    const luckyMap: Record<string, ChaosEvent[]> = {};
+
+                    // 1. Редкий общий подарок судьбы (5% шанс со 2-го цикла)
+                    const isGlobalGift = cycle > 1 && Math.random() < 0.05 && !rollSwap;
+
+                    if (isGlobalGift) {
+                        nextEvents = ['XRAY'];
+                    } else if (rollSwap) {
                         nextEvents = ['SWAP'];
                     } else {
+                        // Обычный дебафф для комнаты
                         const isCombo = cycle > 1 && Math.random() < 0.33;
                         if (isCombo) {
                             const evA = catA[Math.floor(Math.random() * catA.length)];
@@ -274,9 +288,30 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                             const allRegular = [...catA, ...catB];
                             nextEvents = [allRegular[Math.floor(Math.random() * allRegular.length)]];
                         }
+
+                        // 2. Персональный бафф (25% шанс цикла)
+                        const allPids = Object.keys(players);
+                        const candidates = allPids.filter((pid) => !lastLuckyPlayersRef.current.includes(pid));
+
+                        if (Math.random() < 0.25 && candidates.length > 0) {
+                            const maxLucky = allPids.length >= 6 ? 2 : 1;
+                            const shuffled = [...candidates].sort(() => Math.random() - 0.5);
+                            const luckyCount = Math.min(maxLucky, shuffled.length);
+                            const chosen = shuffled.slice(0, luckyCount);
+
+                            chosen.forEach((pid) => {
+                                const roll = Math.random();
+                                const buff: ChaosEvent = roll < 0.50 ? 'TOTEM' : roll < 0.90 ? 'XRAY' : 'JOKER';
+                                luckyMap[pid] = [buff];
+                            });
+
+                            lastLuckyPlayersRef.current = chosen;
+                        } else {
+                            lastLuckyPlayersRef.current = [];
+                        }
                     }
 
-                    socket.emit('host_chaos_event', { code: roomCode, events: nextEvents });
+                    socket.emit('host_chaos_event', { code: roomCode, events: nextEvents, luckyOverrides: luckyMap });
                 }
 
                 return 10;
@@ -429,6 +464,45 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 
     const handleStartDrag = (piece: PlacedShape, e: React.PointerEvent) => {
         if (roundResults || paintSplats.length > 0 || isSwappingBoard) return;
+
+        // Если активен Джокер — фигура мгновенно авто-собирается на правильное место!
+        if (hasEvent('JOKER') && piece.row === null && level.solutionGrid) {
+            // Ищем координаты этой фигуры в решении уровня
+            let targetR: number | null = null;
+            let targetC: number | null = null;
+
+            for (let r = 0; r <= level.gridHeight - piece.matrix.length; r++) {
+                for (let c = 0; c <= level.gridWidth - piece.matrix[0].length; c++) {
+                    let matches = true;
+                    for (let mr = 0; mr < piece.matrix.length; mr++) {
+                        for (let mc = 0; mc < piece.matrix[0].length; mc++) {
+                            if (piece.matrix[mr][mc] === 1 && level.solutionGrid[r + mr]?.[c + mc] !== piece.color) {
+                                matches = false;
+                                break;
+                            }
+                        }
+                        if (!matches) break;
+                    }
+                    if (matches) {
+                        targetR = r;
+                        targetC = c;
+                        break;
+                    }
+                }
+                if (targetR !== null) break;
+            }
+
+            if (targetR !== null && targetC !== null) {
+                sfx.playSnap();
+                if ('vibrate' in navigator) navigator.vibrate([15, 30, 20]);
+                const updated = piecesRef.current.map((p) =>
+                    p.id === piece.id ? { ...p, row: targetR, col: targetC } : p
+                );
+                setPieces(updated);
+                updateTotalProgress(updated);
+                return;
+            }
+        }
 
         setLightPos({ x: e.clientX, y: e.clientY });
 
@@ -858,6 +932,8 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                         }
 
                         const ghostColor = draggedPiece ? getDisplayColor(draggedPiece.color) : '#38bdf8';
+                        const solColor = level.solutionGrid?.[r]?.[c];
+                        const isXrayCell = hasEvent('XRAY') && !cell.color && Boolean(solColor);
 
                         return (
                             <div
@@ -873,9 +949,11 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                                         ? isGhostValid
                                             ? ghostColor
                                             : '#ef4444'
-                                        : isGhostMode && cell.color
-                                            ? 'rgba(148, 163, 184, 0.14)' // Легкая полупрозрачная дымка
-                                            : cell.color || 'rgba(15, 23, 42, 0.55)',
+                                        : isXrayCell
+                                            ? `${solColor}33` // Полупрозрачная подсветка правильного цвета Рентгена
+                                            : isGhostMode && cell.color
+                                                ? 'rgba(148, 163, 184, 0.14)'
+                                                : cell.color || 'rgba(15, 23, 42, 0.55)',
                                     opacity: isGhostCell
                                         ? isGhostValid
                                             ? 0.45
@@ -885,11 +963,13 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                                         ? isGhostValid
                                             ? `2px solid ${ghostColor}`
                                             : '2px solid #ef4444'
-                                        : isGhostMode && cell.color
-                                            ? '1.5px dashed rgba(226, 232, 240, 0.65)' // Четкий читаемый пунктир
-                                            : cell.color
-                                                ? 'none'
-                                                : '1px dashed #334155',
+                                        : isXrayCell
+                                            ? `1.5px dashed ${solColor}` // Пунктирный контур нужной детали
+                                            : isGhostMode && cell.color
+                                                ? '1.5px dashed rgba(226, 232, 240, 0.65)'
+                                                : cell.color
+                                                    ? 'none'
+                                                    : '1px dashed #334155',
                                     cursor: cell.shape ? 'grab' : 'default',
                                     transition: 'background 0.05s ease, opacity 0.25s ease'
                                 }}
@@ -1141,6 +1221,28 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                     onBackToLobby={() => socket.emit('back_to_lobby', { code: roomCode })}
                 />
             )}
+            {/* Верхняя интерфейсная панель */}
+            <GameTopBar
+                roomCode={roomCode}
+                isHost={isHost}
+                isMuted={isMuted}
+                onToggleMute={() => {
+                    sfx.muted = !sfx.muted;
+                    setIsMuted(sfx.muted);
+                }}
+                onExitClick={() => setShowExitConfirm(true)}
+                endRoundVotes={endRoundVotes}
+                totalRoomPlayers={totalRoomPlayers}
+                hasVotedEndRound={endRoundVotes.includes(myId)}
+                onVoteEndRound={() => socket.emit('vote_end_round', { code: roomCode })}
+                activeEvents={activeEvents}
+                eventCountdown={eventCountdown}
+                cycleCount={cycleCountRef.current}
+                opponents={opponents}
+                luckyOverrides={luckyOverrides}
+                playerReactions={playerReactions}
+                onSendReaction={(emoji) => socket.emit('send_reaction', { code: roomCode, emoji, playerId: myId })}
+            />
         </div>
     );
 };

@@ -89,7 +89,7 @@ io.on('connection', (socket) => {
     });
 
     // Синхронизация хаос-ивентов (одиночных и комбо) + Свап досок
-    socket.on('host_chaos_event', ({ code, event, events }: { code: string; event?: string; events?: string[] }) => {
+    socket.on('host_chaos_event', ({ code, events, luckyOverrides }: { code: string; events: any[]; luckyOverrides?: Record<string, any[]> }) => {
         const room = roomManager.getRoom(code);
         if (!room || room.status !== 'PLAYING' || !room.players[socket.id]?.isHost) return;
 
@@ -129,7 +129,7 @@ io.on('connection', (socket) => {
             }
         }
 
-        io.to(room.code).emit('chaos_event_triggered', { events: currentEvents, event: currentEvents[0] });
+        io.to(code).emit('chaos_event_triggered', { events, luckyOverrides });
     });
 
     // Быстрые эмодзи-реакции

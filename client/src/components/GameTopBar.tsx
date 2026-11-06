@@ -20,7 +20,10 @@ const EVENT_INFO: Record<ChaosEvent, { title: string; short: string; color: stri
     GHOST: { title: '👀 ПРИЗРАКИ! У фигур виден только легкий контур!', short: '👀 Призраки', color: '#94a3b8' },
     SWAP: { title: '🌀 СВАП ДОСОК! Обмен полями с соперником!', short: '🌀 Свап досок', color: '#10b981' },
     INVERT_X: { title: '🪞 ЗЕРКАЛО! Палец по горизонтали инвертирован!', short: '🪞 Зеркало X', color: '#f43f5e' },
-    FOG: { title: '🌫️ ТУМАН ВОЙНЫ! Фигуры скрыты в лотке!', short: '🌫️ Туман войны', color: '#64748b' }
+    FOG: { title: '🌫️ ТУМАН ВОЙНЫ! Фигуры скрыты в лотке!', short: '🌫️ Туман войны', color: '#64748b' },
+    TOTEM: { title: '🛡️ ТОТЕМ БЕССМЕРТИЯ! Вы защищены от хаоса!', short: '🛡️ Тотем', color: '#10b981' },
+    XRAY: { title: '🔬 РЕНТГЕН! На поле проявился чертёж сборки!', short: '🔬 Рентген', color: '#06b6d4' },
+    JOKER: { title: '⭐ ДЖОКЕР! Деталь находит свое место сама!', short: '⭐ Джокер', color: '#f59e0b' }
 };
 
 interface GameTopBarProps {
@@ -37,6 +40,7 @@ interface GameTopBarProps {
     eventCountdown: number;
     cycleCount: number;
     opponents: Player[];
+    luckyOverrides?: Record<string, ChaosEvent[]>;
     playerReactions: Record<string, { emoji: string; ts: number }>;
     onSendReaction: (emoji: string) => void;
 }
@@ -55,6 +59,7 @@ export const GameTopBar: React.FC<GameTopBarProps> = ({
     eventCountdown,
     cycleCount,
     opponents,
+    luckyOverrides = {},
     playerReactions,
     onSendReaction
 }) => {
@@ -74,7 +79,7 @@ export const GameTopBar: React.FC<GameTopBarProps> = ({
 
     return (
         <div style={{ width: '100%', maxWidth: 440, flex: '0 0 auto', position: 'relative', zIndex: 7500 }}>
-            {/* Верхние кнопки: выход, скип, код, реакции, звук */}
+            {/* Верхние кнопки управления */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, gap: 6 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <button
@@ -194,7 +199,7 @@ export const GameTopBar: React.FC<GameTopBarProps> = ({
                 </div>
             </div>
 
-            {/* Блок голосования за завершение раунда */}
+            {/* Завершение раунда по голосованию */}
             {endRoundVotes.length > 0 && (
                 <div
                     style={{
@@ -237,7 +242,7 @@ export const GameTopBar: React.FC<GameTopBarProps> = ({
                 </div>
             )}
 
-            {/* Индикатор текущего хаос-ивента или КОМБО */}
+            {/* Баннер текущего ивента / баффа */}
             <div
                 style={{
                     background: '#1e293b',
@@ -264,7 +269,7 @@ export const GameTopBar: React.FC<GameTopBarProps> = ({
                 </div>
             </div>
 
-            {/* Лидерборд соперников */}
+            {/* Список соперников с бейджами баффов */}
             {opponents.length > 0 && (
                 <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2 }}>
                     {opponents.map((opp) => {
@@ -300,7 +305,12 @@ export const GameTopBar: React.FC<GameTopBarProps> = ({
                                 )}
 
                                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 2 }}>
-                                    <span style={{ fontWeight: 600, color: '#e2e8f0', whiteSpace: 'nowrap' }}>{opp.name}</span>
+                                    <span style={{ fontWeight: 600, color: '#e2e8f0', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }}>
+                                        {opp.name}
+                                        {luckyOverrides[opp.id]?.includes('TOTEM') && <span>🛡️</span>}
+                                        {luckyOverrides[opp.id]?.includes('XRAY') && <span>🔬</span>}
+                                        {luckyOverrides[opp.id]?.includes('JOKER') && <span>⭐</span>}
+                                    </span>
                                     <span style={{ color: '#38bdf8' }}>{opp.progress || 0}%</span>
                                 </div>
                                 <div style={{ width: '100%', height: 3, background: '#0f172a', borderRadius: 2, overflow: 'hidden' }}>
