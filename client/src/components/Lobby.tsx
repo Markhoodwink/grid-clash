@@ -802,41 +802,7 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame, onLeaveRo
                                 ⏳ Ожидаем, пока создатель запустит {gridWidth}×{gridHeight} ({!noEvents ? 'Хаос' : 'Классика'})...
                             </div>
                         )}
-                        {isHost ? (
-                            <button
-                                type="button"
-                                className="primary-btn"
-                                onClick={() => onStartGame(gridWidth, gridHeight, noEvents)}
-                                style={{
-                                    width: '100%',
-                                    padding: 14,
-                                    borderRadius: 12,
-                                    background: 'linear-gradient(135deg, #e11d48 0%, #be123c 100%)',
-                                    color: '#fff',
-                                    border: 'none',
-                                    fontWeight: 800,
-                                    fontSize: 16,
-                                    cursor: 'pointer',
-                                    boxShadow: '0 6px 22px rgba(225, 29, 72, 0.5)'
-                                }}
-                            >
-                                🚀 Начать игру ({gridWidth}×{gridHeight})
-                            </button>
-                        ) : (
-                            <div
-                                style={{
-                                    textAlign: 'center',
-                                    color: '#94a3b8',
-                                    fontStyle: 'italic',
-                                    fontSize: 13,
-                                    padding: 8
-                                }}
-                            >
-                                ⏳ Ожидаем, пока создатель запустит {gridWidth}×{gridHeight} ({!noEvents ? 'Хаос' : 'Классика'})...
-                            </div>
-                        )}
 
-                        {/* 👇 ВСТАВЛЯТЬ СЮДА 👇 */}
                         <button
                             type="button"
                             className="primary-btn"
