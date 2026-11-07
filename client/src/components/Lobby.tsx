@@ -13,6 +13,11 @@ interface Room {
     code: string;
     status: string;
     players: Record<string, Player>;
+    settings?: {
+        width: number;
+        height: number;
+        noEvents: boolean;
+    };
 }
 
 interface LobbyProps {
@@ -31,12 +36,16 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
         return localStorage.getItem('gc_name') || '';
     });
 
-    const [noEvents, setNoEvents] = useState<boolean>(false);
+    const [noEvents, setNoEvents] = useState<boolean>(() => Boolean(room?.settings?.noEvents));
     const [code, setCode] = useState('');
     const [error, setError] = useState('');
-    const [gridWidth, setGridWidth] = useState<number>(4);
-    const [gridHeight, setGridHeight] = useState<number>(4);
+    const [gridWidth, setGridWidth] = useState<number>(() => room?.settings?.width || 4);
+    const [gridHeight, setGridHeight] = useState<number>(() => room?.settings?.height || 4);
     const [showGuide, setShowGuide] = useState<boolean>(false);
+
+    const playersList = Object.values(room?.players || {});
+    const isHost = room?.players?.[myId]?.isHost;
+    const totalCells = gridWidth * gridHeight;
 
     useEffect(() => {
         const tg = (window as any).Telegram?.WebApp;
@@ -53,6 +62,40 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
             }
         }
     }, []);
+
+    // Синхронизация при подключении к уже существующей комнате
+    useEffect(() => {
+        if (room?.settings) {
+            setGridWidth(room.settings.width || 4);
+            setGridHeight(room.settings.height || 4);
+            setNoEvents(Boolean(room.settings.noEvents));
+        }
+    }, [room?.settings]);
+
+    // Синхронизация изменений хоста на лету
+    useEffect(() => {
+        const handleSettingsUpdated = ({ width, height, noEvents: incomingNoEvents }: { width: number; height: number; noEvents: boolean }) => {
+            setGridWidth(width);
+            setGridHeight(height);
+            setNoEvents(incomingNoEvents);
+        };
+
+        socket.on('room_settings_updated', handleSettingsUpdated);
+        return () => {
+            socket.off('room_settings_updated', handleSettingsUpdated);
+        };
+    }, []);
+
+    const emitSettings = (w: number, h: number, ne: boolean) => {
+        if (isHost && room?.code) {
+            socket.emit('update_room_settings', {
+                code: room.code,
+                width: w,
+                height: h,
+                noEvents: ne
+            });
+        }
+    };
 
     const handleCreateRoom = (e: React.FormEvent) => {
         e.preventDefault();
@@ -82,22 +125,28 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
         socket.emit('join_room', { code, playerName: name.trim(), userId: uid });
     };
 
-    const setPreset = (size: number) => {
+    const handleSetNoEvents = (val: boolean) => {
+        setNoEvents(val);
+        emitSettings(gridWidth, gridHeight, val);
+    };
+
+    const handleSetPreset = (size: number) => {
         setGridWidth(size);
         setGridHeight(size);
+        emitSettings(size, size, noEvents);
     };
 
-    const changeWidth = (delta: number) => {
-        setGridWidth((prev) => Math.max(3, Math.min(10, prev + delta)));
+    const handleChangeWidth = (delta: number) => {
+        const newW = Math.max(3, Math.min(10, gridWidth + delta));
+        setGridWidth(newW);
+        emitSettings(newW, gridHeight, noEvents);
     };
 
-    const changeHeight = (delta: number) => {
-        setGridHeight((prev) => Math.max(3, Math.min(10, prev + delta)));
+    const handleChangeHeight = (delta: number) => {
+        const newH = Math.max(3, Math.min(10, gridHeight + delta));
+        setGridHeight(newH);
+        emitSettings(gridWidth, newH, noEvents);
     };
-
-    const playersList = Object.values(room?.players || {});
-    const isHost = room?.players?.[myId]?.isHost;
-    const totalCells = gridWidth * gridHeight;
 
     return (
         <div
@@ -127,10 +176,8 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
         }
       `}</style>
 
-            {/* 1. Безотказный Canvas-фон с фигурами */}
             <SpaceCanvasBackground />
 
-            {/* Фиксированные плашки в самом углу экрана */}
             <div
                 style={{
                     position: 'fixed',
@@ -181,7 +228,6 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                 </button>
             </div>
 
-            {/* 2. Карточка меню со стеклянным эффектом */}
             <div
                 style={{
                     position: 'relative',
@@ -367,7 +413,8 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                             </div>
                         </div>
 
-                        {isHost && (
+                        {/* Интерактивная панель управления для ХОСТА */}
+                        {isHost ? (
                             <div
                                 style={{
                                     marginBottom: 18,
@@ -377,7 +424,6 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                                     border: '1px solid rgba(255, 255, 255, 0.08)'
                                 }}
                             >
-                                {/* Переключатель режима: Хаос / Без ивентов */}
                                 <div style={{ marginBottom: 12 }}>
                                     <div style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600, marginBottom: 6 }}>
                                         Режим раунда:
@@ -385,7 +431,7 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
                                         <button
                                             type="button"
-                                            onClick={() => setNoEvents(false)}
+                                            onClick={() => handleSetNoEvents(false)}
                                             style={{
                                                 padding: '8px 10px',
                                                 borderRadius: 8,
@@ -407,7 +453,7 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
 
                                         <button
                                             type="button"
-                                            onClick={() => setNoEvents(true)}
+                                            onClick={() => handleSetNoEvents(true)}
                                             style={{
                                                 padding: '8px 10px',
                                                 borderRadius: 8,
@@ -441,7 +487,7 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                                             <button
                                                 key={size}
                                                 type="button"
-                                                onClick={() => setPreset(size)}
+                                                onClick={() => handleSetPreset(size)}
                                                 style={{
                                                     padding: '7px 0',
                                                     borderRadius: 8,
@@ -466,7 +512,7 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                             <button
                                                 type="button"
-                                                onClick={() => changeWidth(-1)}
+                                                onClick={() => handleChangeWidth(-1)}
                                                 disabled={gridWidth <= 3}
                                                 style={{
                                                     width: 28,
@@ -486,7 +532,7 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                                             </span>
                                             <button
                                                 type="button"
-                                                onClick={() => changeWidth(1)}
+                                                onClick={() => handleChangeWidth(1)}
                                                 disabled={gridWidth >= 10}
                                                 style={{
                                                     width: 28,
@@ -509,7 +555,7 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                             <button
                                                 type="button"
-                                                onClick={() => changeHeight(-1)}
+                                                onClick={() => handleChangeHeight(-1)}
                                                 disabled={gridHeight <= 3}
                                                 style={{
                                                     width: 28,
@@ -529,7 +575,7 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                                             </span>
                                             <button
                                                 type="button"
-                                                onClick={() => changeHeight(1)}
+                                                onClick={() => handleChangeHeight(1)}
                                                 disabled={gridHeight >= 10}
                                                 style={{
                                                     width: 28,
@@ -544,6 +590,59 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                                             >
                                                 +
                                             </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            /* Отображение настроек для ОБЫЧНЫХ ИГРОКОВ (в реальном времени) */
+                            <div
+                                style={{
+                                    marginBottom: 18,
+                                    background: 'rgba(2, 6, 23, 0.6)',
+                                    padding: '14px 16px',
+                                    borderRadius: 14,
+                                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: 10
+                                }}
+                            >
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600 }}>Выбор создателя:</span>
+                                    <span style={{ fontSize: 11, color: '#38bdf8', fontWeight: 700 }}>{totalCells} клеток</span>
+                                </div>
+
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                                    <div
+                                        style={{
+                                            background: !noEvents ? 'rgba(236, 72, 153, 0.15)' : 'rgba(56, 189, 248, 0.15)',
+                                            border: !noEvents ? '1px solid rgba(236, 72, 153, 0.4)' : '1px solid rgba(56, 189, 248, 0.4)',
+                                            padding: '8px 10px',
+                                            borderRadius: 10,
+                                            textAlign: 'center',
+                                            transition: 'all 0.25s ease'
+                                        }}
+                                    >
+                                        <div style={{ fontSize: 10, color: '#94a3b8', marginBottom: 2 }}>Режим</div>
+                                        <div style={{ fontSize: 13, fontWeight: 800, color: !noEvents ? '#f472b6' : '#38bdf8' }}>
+                                            {!noEvents ? '🌪️ Хаос' : '🧘 Без ивентов'}
+                                        </div>
+                                    </div>
+
+                                    <div
+                                        style={{
+                                            background: 'rgba(30, 41, 59, 0.6)',
+                                            border: '1px solid rgba(255, 255, 255, 0.1)',
+                                            padding: '8px 10px',
+                                            borderRadius: 10,
+                                            textAlign: 'center',
+                                            transition: 'all 0.25s ease'
+                                        }}
+                                    >
+                                        <div style={{ fontSize: 10, color: '#94a3b8', marginBottom: 2 }}>Размер поля</div>
+                                        <div style={{ fontSize: 13, fontWeight: 800, color: '#f8fafc' }}>
+                                            {gridWidth} × {gridHeight}
                                         </div>
                                     </div>
                                 </div>
@@ -610,14 +709,13 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                                     padding: 8
                                 }}
                             >
-                                ⏳ Ожидаем, пока создатель запустит игру...
+                                ⏳ Ожидаем, пока создатель запустит {gridWidth}×{gridHeight} ({!noEvents ? 'Хаос' : 'Классика'})...
                             </div>
                         )}
                     </div>
                 )}
             </div>
 
-            {/* 3. Модальное окно гайда */}
             {showGuide && (
                 <div
                     onClick={() => setShowGuide(false)}

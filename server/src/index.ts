@@ -31,6 +31,7 @@ io.on('connection', (socket) => {
             userId: userId || socket.id,
             name: playerName
         });
+        (room as any).settings = { width: 4, height: 4, noEvents: false };
         socket.join(room.code);
         socket.emit('room_joined', room);
     });
@@ -49,6 +50,20 @@ io.on('connection', (socket) => {
         io.to(room.code).emit('room_updated', room);
         socket.emit('room_joined', room);
     });
+
+    // Синхронизация выбора настроек хоста в реальном времени
+    socket.on('update_room_settings', ({ code, width, height, noEvents }) => {
+        const room = roomManager.getRoom(code);
+        if (room && room.players[socket.id]?.isHost) {
+            (room as any).settings = {
+                width: Number(width) || 4,
+                height: Number(height) || 4,
+                noEvents: Boolean(noEvents)
+            };
+            socket.to(code).emit('room_settings_updated', (room as any).settings);
+        }
+    });
+
     socket.on('start_game', ({ code, width, height, noEvents }) => {
         const room = roomManager.getRoom(code);
 
