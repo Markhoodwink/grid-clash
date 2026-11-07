@@ -70,6 +70,13 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                 socket.emit('join_room', { code: startParam, playerName, userId: uid, avatarUrl });
             }
         }
+
+        // 👇 Добавьте сюда: подхват кода из ссылки обычного браузера (?room=1234)
+        const params = new URLSearchParams(window.location.search);
+        const roomParam = params.get('room');
+        if (roomParam && /^\d{4}$/.test(roomParam)) {
+            setCode(roomParam);
+        }
     }, [name, avatarUrl, room]);
 
     useEffect(() => {
@@ -133,19 +140,33 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
     };
 
     // Нативный шеринг инвайта через Telegram
+    // Проверяем, запущены ли мы РЕАЛЬНО внутри Telegram-клиента
+    const isInsideTelegram = Boolean((window as any).Telegram?.WebApp?.initData);
+
     const handleShareInvite = () => {
         if (!room?.code) return;
-        const inviteUrl = `https://t.me/grid_clash_battle_bot/game?startapp=${room.code}`;
-        const text = encodeURIComponent(`Залетай в битву Grid Clash! 🧩 Код комнаты: ${room.code}`);
-        const shareLink = `https://t.me/share/url?url=${inviteUrl}&text=${text}`;
 
-        const tg = (window as any).Telegram?.WebApp;
-        if (tg?.openTelegramLink) {
-            tg.openTelegramLink(shareLink);
+        if (isInsideTelegram) {
+            // Внутри Telegram: делимся через бота
+            const inviteUrl = `https://t.me/grid_clash_battle_bot/game?startapp=${room.code}`;
+            const text = encodeURIComponent(`Залетай в битву Grid Clash! 🧩 Код комнаты: ${room.code}`);
+            (window as any).Telegram?.WebApp?.openTelegramLink(`https://t.me/share/url?url=${inviteUrl}&text=${text}`);
         } else {
-            navigator.clipboard?.writeText(inviteUrl);
-            setCopiedInvite(true);
-            setTimeout(() => setCopiedInvite(false), 2000);
+            // В обычном браузере: копируем прямую ссылку на сайт
+            const webUrl = `${window.location.origin}?room=${room.code}`;
+            navigator.clipboard?.writeText(webUrl).then(() => {
+                setCopiedInvite(true);
+                setTimeout(() => setCopiedInvite(false), 2000);
+            }).catch(() => {
+                const input = document.createElement('input');
+                input.value = webUrl;
+                document.body.appendChild(input);
+                input.select();
+                document.execCommand('copy');
+                document.body.removeChild(input);
+                setCopiedInvite(true);
+                setTimeout(() => setCopiedInvite(false), 2000);
+            });
         }
     };
 
@@ -466,7 +487,7 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                                     gap: 6
                                 }}
                             >
-                                <span>📢</span> {copiedInvite ? 'Ссылка скопирована!' : 'Позвать друга'}
+                                <span>📢</span> {copiedInvite ? 'Ссылка скопирована!' : isInsideTelegram ? 'Позвать друга' : 'Скопировать ссылку'}
                             </button>
                         </div>
 
