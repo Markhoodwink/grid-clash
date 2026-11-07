@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { socket } from '../socket';
 import { SpaceCanvasBackground } from './SpaceCanvasBackground';
 
@@ -6,6 +6,7 @@ interface Player {
     id: string;
     name: string;
     score: number;
+    avatarUrl?: string | null;
     isHost?: boolean;
 }
 
@@ -27,8 +28,9 @@ interface LobbyProps {
 }
 
 export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
+    const tgUser = (window as any).Telegram?.WebApp?.initDataUnsafe?.user;
+
     const [name, setName] = useState(() => {
-        const tgUser = (window as any).Telegram?.WebApp?.initDataUnsafe?.user;
         if (tgUser?.first_name) {
             const fullName = [tgUser.first_name, tgUser.last_name].filter(Boolean).join(' ');
             return fullName.slice(0, 12);
@@ -36,13 +38,16 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
         return localStorage.getItem('gc_name') || '';
     });
 
+    const [avatarUrl] = useState<string>(() => tgUser?.photo_url || '');
     const [noEvents, setNoEvents] = useState<boolean>(() => Boolean(room?.settings?.noEvents));
     const [code, setCode] = useState('');
     const [error, setError] = useState('');
     const [gridWidth, setGridWidth] = useState<number>(() => room?.settings?.width || 4);
     const [gridHeight, setGridHeight] = useState<number>(() => room?.settings?.height || 4);
     const [showGuide, setShowGuide] = useState<boolean>(false);
+    const [copiedInvite, setCopiedInvite] = useState(false);
 
+    const hasAutoJoinedRef = useRef(false);
     const playersList = Object.values(room?.players || {});
     const isHost = room?.players?.[myId]?.isHost;
     const totalCells = gridWidth * gridHeight;
@@ -55,15 +60,18 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
             tg.setHeaderColor?.('#090d1a');
             tg.setBackgroundColor?.('#090d1a');
 
-            const tgUser = tg.initDataUnsafe?.user;
-            if (tgUser?.first_name) {
-                const fullName = [tgUser.first_name, tgUser.last_name].filter(Boolean).join(' ');
-                setName(fullName.slice(0, 12));
+            // Автоматический вход по реферальной инвайт-ссылке (startapp=1234)
+            const startParam = tg.initDataUnsafe?.start_param;
+            if (startParam && /^\d{4}$/.test(startParam) && !hasAutoJoinedRef.current && !room) {
+                hasAutoJoinedRef.current = true;
+                const uid = localStorage.getItem('gc_user_id') || '';
+                const playerName = name.trim() || tgUser?.first_name || 'Игрок';
+                localStorage.setItem('gc_name', playerName);
+                socket.emit('join_room', { code: startParam, playerName, userId: uid, avatarUrl });
             }
         }
-    }, []);
+    }, [name, avatarUrl, room]);
 
-    // Синхронизация при подключении к уже существующей комнате
     useEffect(() => {
         if (room?.settings) {
             setGridWidth(room.settings.width || 4);
@@ -72,7 +80,6 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
         }
     }, [room?.settings]);
 
-    // Синхронизация изменений хоста на лету
     useEffect(() => {
         const handleSettingsUpdated = ({ width, height, noEvents: incomingNoEvents }: { width: number; height: number; noEvents: boolean }) => {
             setGridWidth(width);
@@ -106,7 +113,7 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
         setError('');
         const uid = localStorage.getItem('gc_user_id') || '';
         localStorage.setItem('gc_name', name.trim());
-        socket.emit('create_room', { playerName: name.trim(), userId: uid });
+        socket.emit('create_room', { playerName: name.trim(), userId: uid, avatarUrl });
     };
 
     const handleJoinRoom = (e: React.FormEvent) => {
@@ -122,7 +129,24 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
         setError('');
         const uid = localStorage.getItem('gc_user_id') || '';
         localStorage.setItem('gc_name', name.trim());
-        socket.emit('join_room', { code, playerName: name.trim(), userId: uid });
+        socket.emit('join_room', { code, playerName: name.trim(), userId: uid, avatarUrl });
+    };
+
+    // Нативный шеринг инвайта через Telegram
+    const handleShareInvite = () => {
+        if (!room?.code) return;
+        const inviteUrl = `https://t.me/grid_clash_battle_bot/game?startapp=${room.code}`;
+        const text = encodeURIComponent(`Залетай в битву Grid Clash! 🧩 Код комнаты: ${room.code}`);
+        const shareLink = `https://t.me/share/url?url=${inviteUrl}&text=${text}`;
+
+        const tg = (window as any).Telegram?.WebApp;
+        if (tg?.openTelegramLink) {
+            tg.openTelegramLink(shareLink);
+        } else {
+            navigator.clipboard?.writeText(inviteUrl);
+            setCopiedInvite(true);
+            setTimeout(() => setCopiedInvite(false), 2000);
+        }
     };
 
     const handleSetNoEvents = (val: boolean) => {
@@ -202,7 +226,7 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                         boxShadow: '0 2px 10px rgba(0,0,0,0.5)'
                     }}
                 >
-                    v2.2
+                    v2.3
                 </span>
 
                 <button
@@ -283,23 +307,33 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                         )}
 
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                            <input
-                                type="text"
-                                placeholder="Ваш никнейм"
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
-                                maxLength={12}
-                                style={{
-                                    padding: 13,
-                                    borderRadius: 12,
-                                    border: '1px solid rgba(255, 255, 255, 0.15)',
-                                    background: 'rgba(2, 6, 23, 0.7)',
-                                    color: '#fff',
-                                    fontSize: 16,
-                                    outline: 'none',
-                                    boxShadow: 'inset 0 2px 6px rgba(0,0,0,0.4)'
-                                }}
-                            />
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                {avatarUrl && (
+                                    <img
+                                        src={avatarUrl}
+                                        alt=""
+                                        style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover', border: '2px solid #38bdf8' }}
+                                    />
+                                )}
+                                <input
+                                    type="text"
+                                    placeholder="Ваш никнейм"
+                                    value={name}
+                                    onChange={(e) => setName(e.target.value)}
+                                    maxLength={12}
+                                    style={{
+                                        flex: 1,
+                                        padding: 13,
+                                        borderRadius: 12,
+                                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                                        background: 'rgba(2, 6, 23, 0.7)',
+                                        color: '#fff',
+                                        fontSize: 16,
+                                        outline: 'none',
+                                        boxShadow: 'inset 0 2px 6px rgba(0,0,0,0.4)'
+                                    }}
+                                />
+                            </div>
 
                             <button
                                 type="button"
@@ -387,7 +421,7 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                     </div>
                 ) : (
                     <div>
-                        <div style={{ textAlign: 'center', marginBottom: 18 }}>
+                        <div style={{ textAlign: 'center', marginBottom: 14 }}>
                             <span
                                 style={{
                                     fontSize: 11,
@@ -411,13 +445,35 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                             >
                                 {room.code}
                             </div>
+
+                            {/* Кнопка "Позвать друга" */}
+                            <button
+                                type="button"
+                                className="primary-btn"
+                                onClick={handleShareInvite}
+                                style={{
+                                    marginTop: 10,
+                                    background: 'rgba(56, 189, 248, 0.16)',
+                                    border: '1px solid #38bdf8',
+                                    color: '#38bdf8',
+                                    padding: '7px 16px',
+                                    borderRadius: 10,
+                                    fontSize: 13,
+                                    fontWeight: 800,
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: 6
+                                }}
+                            >
+                                <span>📢</span> {copiedInvite ? 'Ссылка скопирована!' : 'Позвать друга'}
+                            </button>
                         </div>
 
-                        {/* Интерактивная панель управления для ХОСТА */}
                         {isHost ? (
                             <div
                                 style={{
-                                    marginBottom: 18,
+                                    marginBottom: 16,
                                     background: 'rgba(2, 6, 23, 0.6)',
                                     padding: 12,
                                     borderRadius: 14,
@@ -595,10 +651,9 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                                 </div>
                             </div>
                         ) : (
-                            /* Отображение настроек для ОБЫЧНЫХ ИГРОКОВ (в реальном времени) */
                             <div
                                 style={{
-                                    marginBottom: 18,
+                                    marginBottom: 16,
                                     background: 'rgba(2, 6, 23, 0.6)',
                                     padding: '14px 16px',
                                     borderRadius: 14,
@@ -663,14 +718,27 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                                             justifyContent: 'space-between',
                                             alignItems: 'center',
                                             background: p.id === myId ? 'rgba(2, 6, 23, 0.7)' : 'rgba(30, 41, 59, 0.45)',
-                                            padding: '9px 12px',
+                                            padding: '8px 12px',
                                             borderRadius: 10,
                                             border: p.id === myId ? '1px solid rgba(56, 189, 248, 0.4)' : '1px solid rgba(255, 255, 255, 0.06)'
                                         }}
                                     >
-                                        <span style={{ fontWeight: 600, fontSize: 14 }}>
-                                            {p.name} {p.isHost ? '👑' : ''} {p.id === myId ? '(Вы)' : ''}
-                                        </span>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                            {p.avatarUrl ? (
+                                                <img
+                                                    src={p.avatarUrl}
+                                                    alt=""
+                                                    style={{ width: 26, height: 26, borderRadius: '50%', objectFit: 'cover', border: '1px solid rgba(56, 189, 248, 0.5)' }}
+                                                />
+                                            ) : (
+                                                <div style={{ width: 26, height: 26, borderRadius: '50%', background: '#334155', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>
+                                                    👤
+                                                </div>
+                                            )}
+                                            <span style={{ fontWeight: 600, fontSize: 14 }}>
+                                                {p.name} {p.isHost ? '👑' : ''} {p.id === myId ? '(Вы)' : ''}
+                                            </span>
+                                        </div>
                                         <span style={{ color: '#38bdf8', fontSize: 13, fontWeight: 700 }}>
                                             {p.score || 0} побед
                                         </span>

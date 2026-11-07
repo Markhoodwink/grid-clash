@@ -25,23 +25,25 @@ const roomManager = new RoomManager();
 io.on('connection', (socket) => {
     console.log(`User connected: ${socket.id}`);
 
-    socket.on('create_room', ({ playerName, userId }) => {
+    socket.on('create_room', ({ playerName, userId, avatarUrl }) => {
         const room = roomManager.createRoom({
             id: socket.id,
             userId: userId || socket.id,
-            name: playerName
-        });
+            name: playerName,
+            avatarUrl: avatarUrl || null
+        } as any);
         (room as any).settings = { width: 4, height: 4, noEvents: false };
         socket.join(room.code);
         socket.emit('room_joined', room);
     });
 
-    socket.on('join_room', ({ code, playerName, userId }) => {
+    socket.on('join_room', ({ code, playerName, userId, avatarUrl }) => {
         const room = roomManager.joinRoom(code, {
             id: socket.id,
             userId: userId || socket.id,
-            name: playerName
-        });
+            name: playerName,
+            avatarUrl: avatarUrl || null
+        } as any);
         if (!room) {
             socket.emit('error_message', 'Комната не найдена');
             return;
@@ -270,7 +272,6 @@ io.on('connection', (socket) => {
         if (existingPlayer) {
             const oldSocketId = existingPlayer.id;
 
-            // Если socket.id изменился — перепривязываем игрока
             if (oldSocketId !== socket.id) {
                 delete room.players[oldSocketId];
                 existingPlayer.id = socket.id;
