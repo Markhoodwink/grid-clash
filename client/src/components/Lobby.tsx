@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { socket } from '../socket';
 import { SpaceCanvasBackground } from './SpaceCanvasBackground';
-
 
 interface Player {
     id: string;
@@ -19,16 +18,41 @@ interface Room {
 interface LobbyProps {
     room: Room | null;
     myId: string;
-    onStartGame: (width: number, height: number) => void;
+    onStartGame: (width: number, height: number, noEvents?: boolean) => void;
 }
 
 export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
-    const [name, setName] = useState(localStorage.getItem('gc_name') || '');
+    const [name, setName] = useState(() => {
+        const tgUser = (window as any).Telegram?.WebApp?.initDataUnsafe?.user;
+        if (tgUser?.first_name) {
+            const fullName = [tgUser.first_name, tgUser.last_name].filter(Boolean).join(' ');
+            return fullName.slice(0, 12);
+        }
+        return localStorage.getItem('gc_name') || '';
+    });
+
+    const [noEvents, setNoEvents] = useState<boolean>(false);
     const [code, setCode] = useState('');
     const [error, setError] = useState('');
     const [gridWidth, setGridWidth] = useState<number>(4);
     const [gridHeight, setGridHeight] = useState<number>(4);
     const [showGuide, setShowGuide] = useState<boolean>(false);
+
+    useEffect(() => {
+        const tg = (window as any).Telegram?.WebApp;
+        if (tg) {
+            tg.ready();
+            tg.expand();
+            tg.setHeaderColor?.('#090d1a');
+            tg.setBackgroundColor?.('#090d1a');
+
+            const tgUser = tg.initDataUnsafe?.user;
+            if (tgUser?.first_name) {
+                const fullName = [tgUser.first_name, tgUser.last_name].filter(Boolean).join(' ');
+                setName(fullName.slice(0, 12));
+            }
+        }
+    }, []);
 
     const handleCreateRoom = (e: React.FormEvent) => {
         e.preventDefault();
@@ -106,7 +130,7 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
             {/* 1. Безотказный Canvas-фон с фигурами */}
             <SpaceCanvasBackground />
 
-            {/* Фиксированные плашки в самом углу экрана (ВНЕ карточки со стеклом!) */}
+            {/* Фиксированные плашки в самом углу экрана */}
             <div
                 style={{
                     position: 'fixed',
@@ -173,7 +197,6 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                     border: '1px solid rgba(255, 255, 255, 0.14)'
                 }}
             >
-
                 {!room ? (
                     <div>
                         <div style={{ textAlign: 'center', marginBottom: 22 }}>
@@ -354,6 +377,58 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                                     border: '1px solid rgba(255, 255, 255, 0.08)'
                                 }}
                             >
+                                {/* Переключатель режима: Хаос / Без ивентов */}
+                                <div style={{ marginBottom: 12 }}>
+                                    <div style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600, marginBottom: 6 }}>
+                                        Режим раунда:
+                                    </div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                                        <button
+                                            type="button"
+                                            onClick={() => setNoEvents(false)}
+                                            style={{
+                                                padding: '8px 10px',
+                                                borderRadius: 8,
+                                                border: !noEvents ? '2px solid #ec4899' : '1px solid rgba(255, 255, 255, 0.08)',
+                                                background: !noEvents ? 'rgba(236, 72, 153, 0.25)' : 'rgba(30, 41, 59, 0.7)',
+                                                color: !noEvents ? '#f472b6' : '#94a3b8',
+                                                fontWeight: 700,
+                                                fontSize: 12,
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                gap: 6,
+                                                boxShadow: !noEvents ? '0 0 12px rgba(236, 72, 153, 0.35)' : 'none'
+                                            }}
+                                        >
+                                            <span>🌪️</span> Хаос
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => setNoEvents(true)}
+                                            style={{
+                                                padding: '8px 10px',
+                                                borderRadius: 8,
+                                                border: noEvents ? '2px solid #38bdf8' : '1px solid rgba(255, 255, 255, 0.08)',
+                                                background: noEvents ? 'rgba(56, 189, 248, 0.25)' : 'rgba(30, 41, 59, 0.7)',
+                                                color: noEvents ? '#38bdf8' : '#94a3b8',
+                                                fontWeight: 700,
+                                                fontSize: 12,
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                gap: 6,
+                                                boxShadow: noEvents ? '0 0 12px rgba(56, 189, 248, 0.35)' : 'none'
+                                            }}
+                                        >
+                                            <span>🧘</span> Без ивентов
+                                        </button>
+                                    </div>
+                                </div>
+
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                                     <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600 }}>Пресеты поля:</span>
                                     <span style={{ fontSize: 11, color: '#38bdf8', fontWeight: 700 }}>{totalCells} клеток</span>
@@ -509,7 +584,7 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                             <button
                                 type="button"
                                 className="primary-btn"
-                                onClick={() => onStartGame(gridWidth, gridHeight)}
+                                onClick={() => onStartGame(gridWidth, gridHeight, noEvents)}
                                 style={{
                                     width: '100%',
                                     padding: 14,
@@ -566,7 +641,7 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                             border: '1px solid rgba(56, 189, 248, 0.35)',
                             borderRadius: 22,
                             padding: '22px 24px',
-                            maxWidth: 700, // Было 420 — теперь на ПК окно просторное и удобное!
+                            maxWidth: 700,
                             width: '100%',
                             maxHeight: '86vh',
                             display: 'flex',
@@ -575,7 +650,6 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                             boxSizing: 'border-box'
                         }}
                     >
-                        {/* Заголовок модалки */}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                 <span style={{ fontSize: 24 }}>📖</span>
@@ -605,7 +679,6 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                             </button>
                         </div>
 
-                        {/* Скролл с правилами */}
                         <div
                             style={{
                                 overflowY: 'auto',
@@ -618,7 +691,6 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                                 lineHeight: 1.5
                             }}
                         >
-                            {/* Верхние блоки: Суть и Управление (на ПК встают рядом в 2 колонки) */}
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 10 }}>
                                 <div style={{ background: 'rgba(2, 6, 23, 0.6)', padding: 14, borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)' }}>
                                     <div style={{ fontWeight: 800, color: '#38bdf8', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6, fontSize: 14 }}>
@@ -640,7 +712,6 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                                 </div>
                             </div>
 
-                            {/* Хаос-ивенты (на ПК автоматически выстраиваются в 2 колонки) */}
                             <div style={{ background: 'rgba(2, 6, 23, 0.6)', padding: 14, borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)' }}>
                                 <div style={{ fontWeight: 800, color: '#ec4899', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6, fontSize: 14 }}>
                                     <span>🌪️</span> Хаос-ивенты (каждые 10с)
@@ -658,7 +729,7 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                                     <div>🌀 <b>Свап досок:</b> редкий супер-ивент — моментальный обмен полями!</div>
                                 </div>
                             </div>
-                            {/* Подарки судьбы (Баффы) */}
+
                             <div style={{ background: 'rgba(2, 6, 23, 0.6)', padding: 14, borderRadius: 12, border: '1px solid rgba(56, 189, 248, 0.3)' }}>
                                 <div style={{ fontWeight: 800, color: '#38bdf8', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6, fontSize: 14 }}>
                                     <span>✨</span> Подарки судьбы (Баффы вместо хаоса)
@@ -672,17 +743,15 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                                     💡 <i>Баффы выпадают персонально случайным игрокам взамен плохого ивента. В списке игроков сверху виден значок удачи!</i>
                                 </div>
                             </div>
-                            {/* Комбо */}
+
                             <div style={{ background: 'rgba(2, 6, 23, 0.6)', padding: 14, borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)' }}>
                                 <div style={{ fontWeight: 800, color: '#f43f5e', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6, fontSize: 14 }}>
                                     <span>⚡</span> Умные комбо (33% шанс)
                                 </div>
                                 Со 2-го цикла раунда игра может запустить 2 события одновременно (например, <i>Заморозка + Зеркало X</i> или <i>Мегакарусель + Туман</i>).
                             </div>
-
                         </div>
 
-                        {/* Кнопка закрытия */}
                         <button
                             type="button"
                             className="primary-btn"

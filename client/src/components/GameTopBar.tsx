@@ -107,9 +107,11 @@ export const GameTopBar: React.FC<GameTopBarProps> = ({
     };
 
     const bannerTitle =
-        activeEvents.length > 1
-            ? `⚡ КОМБО: ${EVENT_INFO[activeEvents[0]]?.short} + ${EVENT_INFO[activeEvents[1]]?.short}!`
-            : EVENT_INFO[activeEvents[0]]?.title || 'Спокойствие...';
+        activeEvents[0] === 'NONE' && cycleCount === 0
+            ? '🧘 Чистая битва (Без ивентов)'
+            : activeEvents.length > 1
+                ? `⚡ КОМБО: ${EVENT_INFO[activeEvents[0]]?.short} + ${EVENT_INFO[activeEvents[1]]?.short}!`
+                : EVENT_INFO[activeEvents[0]]?.title || 'Спокойствие...';
 
     const bannerColor =
         activeEvents.length > 1

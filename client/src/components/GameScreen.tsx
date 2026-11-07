@@ -26,6 +26,7 @@ interface GameScreenProps {
         targetCellsCount: number;
         pieces: Shape[];
         solutionGrid?: string[][];
+        noEvents?: boolean; // <--- добавили
     };
     roomCode: string;
     players?: Record<string, Player>;
@@ -41,6 +42,20 @@ export const GameScreen: React.FC<GameScreenProps> = ({
     players = {},
     myId = ''
 }) => {
+    // Универсальная тактильная отдача для мобильного Telegram и браузера
+    const triggerHaptic = (type: 'light' | 'medium' | 'heavy' | 'error' | 'success' = 'light') => {
+        const tgHaptic = (window as any).Telegram?.WebApp?.HapticFeedback;
+        if (tgHaptic) {
+            if (type === 'error' || type === 'success') {
+                tgHaptic.notificationOccurred(type);
+            } else {
+                tgHaptic.impactOccurred(type);
+            }
+        } else if ('vibrate' in navigator) {
+            navigator.vibrate(type === 'error' ? [40, 30, 80] : type === 'medium' ? 20 : 10);
+        }
+    };
+
     const maxDimension = Math.max(level.gridWidth, level.gridHeight);
     const CELL_SIZE = maxDimension >= 8 ? 32 : maxDimension >= 6 ? 40 : maxDimension === 5 ? 48 : 54;
     const CELL_GAP = maxDimension >= 7 ? 4 : 5;
@@ -258,7 +273,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 
     // Таймер раунда
     useEffect(() => {
-        if (roundResults) return;
+        if (roundResults || level.noEvents) return;
 
         const timer = setInterval(() => {
             setEventCountdown((prev) => {
@@ -378,7 +393,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
         // Звук удара, вибрация и плашка
         sfx.playEarthquakeDrop();
         if ('vibrate' in navigator) {
-            navigator.vibrate([40, 30, 80]);
+            triggerHaptic('error');
         }
 
         setEarthquakeAlert('🌋 Тряска сбила фигуру в лоток!');
@@ -522,7 +537,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 
         if (bumpedAny) sfx.playReturn();
         sfx.playSnap();
-        if ('vibrate' in navigator) navigator.vibrate([15, 30, 20]);
+        triggerHaptic('success');
 
         // 1. Помечаем фигуру как навсегда ЗОЛОТУЮ
         setGoldPieceIds((prev) => [...prev, piece.id]);
@@ -538,6 +553,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 
         if (frozenPieces[id] && frozenPieces[id] > 0) {
             sfx.playIceCrack();
+            triggerHaptic('medium'); // <--- добавляем сюда
             setFrozenPieces((prev) => ({
                 ...prev,
                 [id]: Math.max(0, (prev[id] || 0) - 1)
@@ -698,7 +714,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 
             if (snap && snap.isValid) {
                 sfx.playSnap();
-                if ('vibrate' in navigator) navigator.vibrate(10);
+                triggerHaptic('light');
 
                 const updated = currentPieces.map((p) =>
                     p.id === piece.id ? { ...p, row: snap.row, col: snap.col } : p
@@ -1385,7 +1401,8 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                         socket.emit('start_game', {
                             code: roomCode,
                             width: level.gridWidth,
-                            height: level.gridHeight
+                            height: level.gridHeight,
+                            noEvents: level.noEvents
                         });
                     }}
                     onBackToLobby={() => socket.emit('back_to_lobby', { code: roomCode })}

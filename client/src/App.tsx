@@ -117,8 +117,10 @@ export function App() {
             {!level ? (
                 <Lobby
                     room={room}
-                    myId={myId || socket.id || ''}
-                    onStartGame={handleStartGame}
+                    myId={myId}
+                    onStartGame={(w, h, noEvents) => {
+                        socket.emit('start_game', { code: room.code, width: w, height: h, noEvents });
+                    }}
                 />
             ) : (
                 <GameScreen
