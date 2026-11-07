@@ -25,9 +25,10 @@ interface LobbyProps {
     room: Room | null;
     myId: string;
     onStartGame: (width: number, height: number, noEvents?: boolean) => void;
+    onLeaveRoom: () => void;
 }
 
-export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
+export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame, onLeaveRoom }) => {
     const tgUser = (window as any).Telegram?.WebApp?.initDataUnsafe?.user;
 
     const [name, setName] = useState(() => {
@@ -247,7 +248,7 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                         boxShadow: '0 2px 10px rgba(0,0,0,0.5)'
                     }}
                 >
-                    v2.3
+                    v3.1
                 </span>
 
                 <button
@@ -801,6 +802,64 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame }) => {
                                 ⏳ Ожидаем, пока создатель запустит {gridWidth}×{gridHeight} ({!noEvents ? 'Хаос' : 'Классика'})...
                             </div>
                         )}
+                        {isHost ? (
+                            <button
+                                type="button"
+                                className="primary-btn"
+                                onClick={() => onStartGame(gridWidth, gridHeight, noEvents)}
+                                style={{
+                                    width: '100%',
+                                    padding: 14,
+                                    borderRadius: 12,
+                                    background: 'linear-gradient(135deg, #e11d48 0%, #be123c 100%)',
+                                    color: '#fff',
+                                    border: 'none',
+                                    fontWeight: 800,
+                                    fontSize: 16,
+                                    cursor: 'pointer',
+                                    boxShadow: '0 6px 22px rgba(225, 29, 72, 0.5)'
+                                }}
+                            >
+                                🚀 Начать игру ({gridWidth}×{gridHeight})
+                            </button>
+                        ) : (
+                            <div
+                                style={{
+                                    textAlign: 'center',
+                                    color: '#94a3b8',
+                                    fontStyle: 'italic',
+                                    fontSize: 13,
+                                    padding: 8
+                                }}
+                            >
+                                ⏳ Ожидаем, пока создатель запустит {gridWidth}×{gridHeight} ({!noEvents ? 'Хаос' : 'Классика'})...
+                            </div>
+                        )}
+
+                        {/* 👇 ВСТАВЛЯТЬ СЮДА 👇 */}
+                        <button
+                            type="button"
+                            className="primary-btn"
+                            onClick={onLeaveRoom}
+                            style={{
+                                width: '100%',
+                                marginTop: 10,
+                                padding: '12px',
+                                borderRadius: 12,
+                                background: 'rgba(51, 65, 85, 0.5)',
+                                color: '#94a3b8',
+                                border: '1px solid rgba(255, 255, 255, 0.1)',
+                                fontWeight: 700,
+                                fontSize: 14,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: 6
+                            }}
+                        >
+                            <span>🚪</span> Выйти в главное меню
+                        </button>
                     </div>
                 )}
             </div>

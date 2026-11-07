@@ -40,6 +40,13 @@ export function App() {
             localStorage.setItem('gc_active_room', updatedRoom.code);
         };
 
+        const onLeftRoom = () => {
+            localStorage.removeItem('gc_active_room');
+            setRoom(null);
+        };
+
+        socket.on('left_room', onLeftRoom);
+
         const onRoomUpdated = (updatedRoom: any) => {
             setRoom(updatedRoom);
         };
@@ -97,6 +104,7 @@ export function App() {
             socket.off('room_joined', onRoomJoined);
             socket.off('room_updated', onRoomUpdated);
             socket.off('game_started', onGameStarted);
+            socket.off('left_room', onLeftRoom);
             socket.off('session_restored', onSessionRestored);
             socket.off('session_expired', onSessionExpired);
             socket.off('returned_to_lobby', onReturnedToLobby);
@@ -104,6 +112,16 @@ export function App() {
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
     }, []);
+
+    const handleLeaveRoom = () => {
+        if (room?.code) {
+            socket.emit('leave_room', { code: room.code });
+        }
+        localStorage.removeItem('gc_active_room');
+        setRoom(null);
+        // Очищаем ?room= из URL, если был вход по прямой ссылке
+        window.history.replaceState({}, document.title, window.location.pathname);
+    };
 
     const handleStartGame = (width: number, height: number) => {
         if (room) {
@@ -116,10 +134,9 @@ export function App() {
             {!level ? (
                 <Lobby
                     room={room}
-                    myId={myId}
-                    onStartGame={(w, h, noEvents) => {
-                        socket.emit('start_game', { code: room.code, width: w, height: h, noEvents });
-                    }}
+                    myId={myId || socket.id || ''}
+                    onStartGame={handleStartGame}
+                    onLeaveRoom={handleLeaveRoom}
                 />
             ) : (
                 <GameScreen

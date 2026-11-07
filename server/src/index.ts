@@ -37,6 +37,21 @@ io.on('connection', (socket) => {
         socket.emit('room_joined', room);
     });
 
+    // Выход игрока из лобби в главное меню
+    socket.on('leave_room', ({ code }) => {
+        socket.leave(code);
+        const room = roomManager.removePlayer(socket.id);
+        if (room) {
+            const remaining = Object.values(room.players);
+            // Если вышел хост, передаем корону первому оставшемуся игроку
+            if (remaining.length > 0 && !remaining.some((p) => p.isHost)) {
+                remaining[0].isHost = true;
+            }
+            io.to(room.code).emit('room_updated', room);
+        }
+        socket.emit('left_room');
+    });
+
     socket.on('join_room', ({ code, playerName, userId, avatarUrl }) => {
         const room = roomManager.joinRoom(code, {
             id: socket.id,
