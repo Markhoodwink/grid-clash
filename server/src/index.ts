@@ -181,8 +181,7 @@ io.on('connection', (socket) => {
 
     socket.on('round_finished', ({ code }) => {
         const room = roomManager.getRoom(code);
-        if (room && room.status === 'PLAYING' && room.players[socket.id]) {
-            room.status = 'LOBBY';
+        if (room && room.status === 'PLAYING') {
             room.endRoundVotes = [];
             const winner = room.players[socket.id];
             winner.progress = 100;
@@ -203,11 +202,18 @@ io.on('connection', (socket) => {
         const room = roomManager.getRoom(code);
         if (room) {
             room.status = 'LOBBY';
+            room.currentLevel = null; // Обнуляем уровень, чтобы он не воскресал
             room.endRoundVotes = [];
-            Object.values(room.players).forEach((p) => {
+
+            Object.values(room.players).forEach((p: any) => {
                 p.progress = 0;
+                p.pieces = [];
             });
-            io.to(room.code).emit('returned_to_lobby', room);
+
+            // Отправляем оба события для 100% синхронизации с клиентом
+            io.to(code).emit('returned_to_lobby', room);
+            io.to(code).emit('back_to_lobby', room);
+            io.to(code).emit('room_updated', room);
         }
     });
 
@@ -259,10 +265,12 @@ io.on('connection', (socket) => {
 
             socket.join(room.code);
 
-            // Отправляем игроку полное актуальное состояние игры
+            // Отправляем уровень ТОЛЬКО если прямо сейчас идет игра
+            const activeLevel = room.status === 'PLAYING' ? room.currentLevel : null;
+
             socket.emit('session_restored', {
                 room,
-                level: room.currentLevel,
+                level: activeLevel,
                 myId: socket.id
             });
 

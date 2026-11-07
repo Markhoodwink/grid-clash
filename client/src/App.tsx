@@ -55,7 +55,9 @@ export function App() {
         const onSessionRestored = ({ room: restoredRoom, level: restoredLevel, myId: newMyId }: any) => {
             setMyId(newMyId);
             setRoom(restoredRoom);
-            if (restoredLevel) {
+            if (restoredRoom?.status === 'LOBBY') {
+                setLevel(null);
+            } else if (restoredLevel) {
                 setLevel(restoredLevel);
             }
         };
@@ -78,20 +80,17 @@ export function App() {
         socket.on('session_restored', onSessionRestored);
         socket.on('session_expired', onSessionExpired);
         socket.on('returned_to_lobby', onReturnedToLobby);
+        socket.on('returned_to_lobby', onReturnedToLobby);
+        socket.on('back_to_lobby', onReturnedToLobby);
 
-        // Следим за возвратом вкладки из сна
+        // Следим за возвратом вкладки из сна ТОЛЬКО если сокет реально оборвался
         const handleVisibilityChange = () => {
-            if (document.visibilityState === 'visible') {
-                if (!socket.connected) {
-                    socket.connect();
-                } else {
-                    attemptReconnect();
-                }
+            if (document.visibilityState === 'visible' && !socket.connected) {
+                socket.connect();
             }
         };
 
         document.addEventListener('visibilitychange', handleVisibilityChange);
-        window.addEventListener('focus', attemptReconnect);
 
         return () => {
             socket.off('connect', onConnect);
@@ -101,8 +100,8 @@ export function App() {
             socket.off('session_restored', onSessionRestored);
             socket.off('session_expired', onSessionExpired);
             socket.off('returned_to_lobby', onReturnedToLobby);
+            socket.off('back_to_lobby', onReturnedToLobby);
             document.removeEventListener('visibilitychange', handleVisibilityChange);
-            window.removeEventListener('focus', attemptReconnect);
         };
     }, []);
 
