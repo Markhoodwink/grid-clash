@@ -30,6 +30,7 @@ interface GameTopBarProps {
     roomCode: string;
     isHost?: boolean;
     isMuted: boolean;
+    noEvents?: boolean;
     onToggleMute: () => void;
     onExitClick: () => void;
     endRoundVotes: string[];
@@ -50,6 +51,7 @@ export const GameTopBar: React.FC<GameTopBarProps> = ({
     roomCode,
     isHost,
     isMuted,
+    noEvents,
     onToggleMute,
     onExitClick,
     endRoundVotes,
@@ -106,15 +108,17 @@ export const GameTopBar: React.FC<GameTopBarProps> = ({
         setShowDevModal(false);
     };
 
-    const bannerTitle =
-        activeEvents[0] === 'NONE' && cycleCount === 0
-            ? '🧘 Чистая битва (Без ивентов)'
+    const bannerTitle = noEvents
+        ? '🧘 Чистая битва (Без ивентов)'
+        : activeEvents[0] === 'NONE' && cycleCount === 0
+            ? '⏳ Приготовьтесь...'
             : activeEvents.length > 1
                 ? `⚡ КОМБО: ${EVENT_INFO[activeEvents[0]]?.short} + ${EVENT_INFO[activeEvents[1]]?.short}!`
                 : EVENT_INFO[activeEvents[0]]?.title || 'Спокойствие...';
 
-    const bannerColor =
-        activeEvents.length > 1
+    const bannerColor = noEvents
+        ? '#38bdf8'
+        : activeEvents.length > 1
             ? '#f43f5e'
             : EVENT_INFO[activeEvents[0]]?.color || '#38bdf8';
 
@@ -213,7 +217,7 @@ export const GameTopBar: React.FC<GameTopBarProps> = ({
                         </form>
                     )}
 
-                    {/* Кнопка открытия красивой Dev-панели */}
+                    {/* Кнопка открытия Dev-панели */}
                     {isAdmin && (
                         <button
                             type="button"
@@ -361,12 +365,14 @@ export const GameTopBar: React.FC<GameTopBarProps> = ({
             >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, marginBottom: 4 }}>
                     <span style={{ fontWeight: 700, color: bannerColor }}>{bannerTitle}</span>
-                    <span style={{ fontWeight: 800, color: '#cbd5e1', fontSize: 11 }}>{eventCountdown}с</span>
+                    <span style={{ fontWeight: 800, color: '#cbd5e1', fontSize: 11 }}>
+                        {noEvents ? 'Релакс' : `${eventCountdown}с`}
+                    </span>
                 </div>
                 <div style={{ width: '100%', height: 4, background: '#0f172a', borderRadius: 2, overflow: 'hidden' }}>
                     <div
                         style={{
-                            width: `${(eventCountdown / initialDuration) * 100}%`,
+                            width: noEvents ? '100%' : `${(eventCountdown / initialDuration) * 100}%`,
                             height: '100%',
                             background: bannerColor,
                             transition: 'width 0.95s linear'
@@ -435,7 +441,7 @@ export const GameTopBar: React.FC<GameTopBarProps> = ({
                 </div>
             )}
 
-            {/* Красивое всплывающее окно Чит-меню */}
+            {/* Всплывающее окно Чит-меню */}
             {showDevModal && (
                 <div
                     onClick={() => setShowDevModal(false)}

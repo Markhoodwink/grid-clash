@@ -26,7 +26,7 @@ interface GameScreenProps {
         targetCellsCount: number;
         pieces: Shape[];
         solutionGrid?: string[][];
-        noEvents?: boolean; // <--- добавили
+        noEvents?: boolean;
     };
     roomCode: string;
     players?: Record<string, Player>;
@@ -42,7 +42,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({
     players = {},
     myId = ''
 }) => {
-    // Универсальная тактильная отдача для мобильного Telegram и браузера
     const triggerHaptic = (type: 'light' | 'medium' | 'heavy' | 'error' | 'success' = 'light') => {
         const tgHaptic = (window as any).Telegram?.WebApp?.HapticFeedback;
         if (tgHaptic) {
@@ -105,7 +104,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({
     const [luckyOverrides, setLuckyOverrides] = useState<Record<string, ChaosEvent[]>>({});
     const lastLuckyPlayersRef = useRef<string[]>([]);
 
-    // Состояния для срыва детали во время землетрясения
     const [fallingPiece, setFallingPiece] = useState<{
         id: string;
         matrix: number[][];
@@ -142,12 +140,10 @@ export const GameScreen: React.FC<GameScreenProps> = ({
         eventsList.forEach((ev) => sfx.playEvent(ev));
         earthquakeDropsTriggeredRef.current = { second2: false, second8: false };
 
-        // Сброс одноразового использования Джокера при новом ивенте
         if (eventsList.includes('JOKER')) {
             setJokerUsed(false);
         }
 
-        // Запуск синхронного 2-кратного мигания Рентгена для всех клеток
         if (eventsList.includes('XRAY')) {
             setXrayPulseKey(Date.now());
         }
@@ -193,7 +189,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({
             const overrides = incomingLucky || {};
             setLuckyOverrides(overrides);
 
-            // Если для меня выпал персональный бафф — применяем его вместо дебаффа!
             const myList = overrides[myId] || events || ['NONE'];
             activateChaosEventsLocally(myList);
         });
@@ -271,7 +266,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
         setPaintSplats(newSplats);
     };
 
-    // Таймер раунда
+    // Таймер раунда: если режим без ивентов — таймер не запускается
     useEffect(() => {
         if (roundResults || level.noEvents) return;
 
@@ -298,7 +293,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 
                     const luckyMap: Record<string, ChaosEvent[]> = {};
 
-                    // 1. Редкий общий подарок судьбы (5% шанс со 2-го цикла)
                     const isGlobalGift = cycle > 1 && Math.random() < 0.05 && !rollSwap;
 
                     if (isGlobalGift) {
@@ -306,7 +300,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                     } else if (rollSwap) {
                         nextEvents = ['SWAP'];
                     } else {
-                        // Обычный дебафф для комнаты
                         const isCombo = cycle > 1 && Math.random() < 0.33;
                         if (isCombo) {
                             const evA = catA[Math.floor(Math.random() * catA.length)];
@@ -317,7 +310,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                             nextEvents = [allRegular[Math.floor(Math.random() * allRegular.length)]];
                         }
 
-                        // 2. Персональный бафф (25% шанс цикла)
                         const allPids = Object.keys(players);
                         const candidates = allPids.filter((pid) => !lastLuckyPlayersRef.current.includes(pid));
 
@@ -347,17 +339,14 @@ export const GameScreen: React.FC<GameScreenProps> = ({
         }, 1000);
 
         return () => clearInterval(timer);
-    }, [roundResults, isHost, roomCode, players]);
+    }, [roundResults, isHost, roomCode, players, level.noEvents]);
 
-    // Механика землетрясения: срыв фигуры на 2-й и 8-й секунде
     const triggerEarthquakeDrop = () => {
         const placed = piecesRef.current.filter((p) => p.row !== null && p.col !== null);
         if (placed.length === 0) return;
 
-        // Выбираем случайную фигуру с поля
         const pieceToDrop = placed[Math.floor(Math.random() * placed.length)];
 
-        // Точные координаты на экране для анимации падения
         if (boardRef.current) {
             const boardRect = boardRef.current.getBoundingClientRect();
             const startX = boardRect.left + 10 + pieceToDrop.col! * STEP;
@@ -377,20 +366,17 @@ export const GameScreen: React.FC<GameScreenProps> = ({
             }, 850);
         }
 
-        // Если фигура перетаскивалась прямо сейчас — отпускаем её
         if (draggedPieceRef.current?.id === pieceToDrop.id) {
             setDraggedId(null);
             setDragPos(null);
         }
 
-        // Возвращаем деталь в лоток
         const updated = piecesRef.current.map((p) =>
             p.id === pieceToDrop.id ? { ...p, row: null, col: null } : p
         );
         setPieces(updated);
         updateTotalProgress(updated);
 
-        // Звук удара, вибрация и плашка
         sfx.playEarthquakeDrop();
         if ('vibrate' in navigator) {
             triggerHaptic('error');
@@ -402,7 +388,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({
         }, 2200);
     };
 
-    // Отслеживание 2-й (countdown = 8) и 8-й (countdown = 2) секунды землетрясения
     useEffect(() => {
         if (!hasEvent('EARTHQUAKE') || roundResults) return;
 
@@ -415,7 +400,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({
         }
     }, [eventCountdown, activeEvents, roundResults]);
 
-    // Сдвиг лотка каждые 2.5 сек во время Мегакарусели
     useEffect(() => {
         if (!hasEvent('CAROUSEL') || roundResults) {
             setTrayShift(0);
@@ -458,6 +442,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 
         if (hitAny) sfx.playWipeSqueak();
     };
+
     const handleAutoPlaceJoker = (piece: PlacedShape) => {
         if (!level.solutionGrid) return;
 
@@ -465,7 +450,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({
         let bestC: number | null = null;
         let bestMatrix: number[][] = piece.matrix;
 
-        // Перебираем все 4 поворота, чтобы гарантированно найти место в решении
         let testMatrix = piece.matrix;
         for (let rot = 0; rot < 4; rot++) {
             const rows = testMatrix.length;
@@ -500,7 +484,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 
         if (bestR === null || bestC === null) return;
 
-        // Собираем клетки, куда встанет Джокер
         const targetCells = new Set<string>();
         for (let mr = 0; mr < bestMatrix.length; mr++) {
             for (let mc = 0; mc < bestMatrix[0].length; mc++) {
@@ -510,7 +493,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({
             }
         }
 
-        // Если игрок уже поставил туда другую деталь — возвращаем её в лоток без наложений
         let bumpedAny = false;
         const updated = piecesRef.current.map((p) => {
             if (p.id === piece.id) {
@@ -539,11 +521,8 @@ export const GameScreen: React.FC<GameScreenProps> = ({
         sfx.playSnap();
         triggerHaptic('success');
 
-        // 1. Помечаем фигуру как навсегда ЗОЛОТУЮ
         setGoldPieceIds((prev) => [...prev, piece.id]);
-        // 2. Джокер потрачен — кнопка исчезает и не переходит на другие фигуры!
         setJokerUsed(true);
-
         setPieces(updated);
         updateTotalProgress(updated);
     };
@@ -553,7 +532,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 
         if (frozenPieces[id] && frozenPieces[id] > 0) {
             sfx.playIceCrack();
-            triggerHaptic('medium'); // <--- добавляем сюда
+            triggerHaptic('medium');
             setFrozenPieces((prev) => ({
                 ...prev,
                 [id]: Math.max(0, (prev[id] || 0) - 1)
@@ -876,10 +855,8 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                 }
             `}</style>
 
-            {/* Фон Canvas */}
             <SpaceCanvasBackground celebrate={Boolean(roundWinner && !roundWinner.isAborted)} />
 
-            {/* Оверлеи хаоса */}
             <ChaosOverlays
                 hasEvent={hasEvent}
                 roundFinished={Boolean(roundResults)}
@@ -890,7 +867,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                 recentReaction={recentReaction}
             />
 
-            {/* Анимированная фигура, слетающая с доски от землетрясения */}
             {fallingPiece && (
                 <div
                     key={fallingPiece.key}
@@ -924,7 +900,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                 </div>
             )}
 
-            {/* Всплывающее предупреждение землетрясения */}
             {earthquakeAlert && (
                 <div
                     style={{
@@ -950,12 +925,11 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                 </div>
             )}
 
-            {/* Верхняя интерфейсная панель */}
-            {/* Верхняя интерфейсная панель */}
             <GameTopBar
                 roomCode={roomCode}
                 isHost={isHost}
                 isMuted={isMuted}
+                noEvents={level.noEvents}
                 onToggleMute={() => {
                     sfx.muted = !sfx.muted;
                     setIsMuted(sfx.muted);
@@ -994,7 +968,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                 }}
             />
 
-            {/* Игровое поле: четкий пунктирный контур для призраков */}
             <div
                 ref={boardRef}
                 style={{
@@ -1061,7 +1034,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                                     width: CELL_SIZE,
                                     height: CELL_SIZE,
                                     borderRadius: 8,
-                                    // Если деталь была поставлена Джокером — она навсегда сияет золотом!
                                     background: isGhostCell
                                         ? isGhostValid
                                             ? ghostColor
@@ -1094,7 +1066,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                                     transition: 'background 0.05s ease, opacity 0.25s ease'
                                 }}
                             >
-                                {/* Рентген: синхронно мигает ровно 2 раза по всей доске поверх любых клеток */}
                                 {isXrayActive && (
                                     <div
                                         key={`${xrayPulseKey}-${r}-${c}`}
@@ -1117,7 +1088,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                 )}
             </div>
 
-            {/* Лоток фигур */}
             <div
                 style={{
                     width: '100%',
@@ -1339,7 +1309,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                 })}
             </div>
 
-            {/* Летающая деталь под пальцем */}
             {draggedPiece && dragPos && !roundResults && (
                 <div
                     style={{
@@ -1373,7 +1342,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                 </div>
             )}
 
-            {/* Модалка подтверждения выхода */}
             {showExitConfirm && (
                 <ExitConfirmModal
                     onCancel={() => setShowExitConfirm(false)}
@@ -1384,7 +1352,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                 />
             )}
 
-            {/* Модалка победы */}
             {roundResults && roundWinner && (
                 <GameOverModal
                     roundWinner={roundWinner}

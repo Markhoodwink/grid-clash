@@ -123,9 +123,14 @@ export function App() {
         window.history.replaceState({}, document.title, window.location.pathname);
     };
 
-    const handleStartGame = (width: number, height: number) => {
+    const handleStartGame = (width: number, height: number, noEvents?: boolean) => {
         if (room) {
-            socket.emit('start_game', { code: room.code, width, height });
+            socket.emit('start_game', {
+                code: room.code,
+                width,
+                height,
+                noEvents: Boolean(noEvents)
+            });
         }
     };
 

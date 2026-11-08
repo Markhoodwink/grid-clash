@@ -83,28 +83,26 @@ io.on('connection', (socket) => {
 
     socket.on('start_game', ({ code, width, height, noEvents }) => {
         const room = roomManager.getRoom(code);
-
         if (room && room.players[socket.id]?.isHost) {
             room.status = 'PLAYING';
             room.endRoundVotes = [];
+            room.currentLevel = generateLevel(width || 4, height || 4);
+            // Записываем флаг режима в уровень
+            (room.currentLevel as any).noEvents = Boolean(noEvents);
 
-            // 1. Создаем ОДИН уровень и крепим флаг режима
-            const level = generateLevel(width || 4, height || 4);
-            (level as any).noEvents = Boolean(noEvents);
-            room.currentLevel = level;
-
-            // 2. Раздаем игрокам детали именно этого уровня
-            Object.values(room.players).forEach((p: any) => {
+            Object.values(room.players).forEach((p) => {
                 p.progress = 0;
-                p.pieces = level.pieces.map((piece) => ({
+                p.pieces = room.currentLevel!.pieces.map((piece) => ({
                     ...piece,
                     row: null,
                     col: null
                 }));
             });
 
-            // 3. Отправляем уровень всем в комнате
-            io.to(code).emit('game_started', { level });
+            io.to(room.code).emit('game_started', {
+                level: room.currentLevel,
+                players: room.players
+            });
         }
     });
 
