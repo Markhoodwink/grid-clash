@@ -52,6 +52,7 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame, onLeaveRo
     const playersList = Object.values(room?.players || {});
     const isHost = room?.players?.[myId]?.isHost;
     const totalCells = gridWidth * gridHeight;
+    const [isConnected, setIsConnected] = useState(() => socket.connected);
 
     useEffect(() => {
         const tg = (window as any).Telegram?.WebApp;
@@ -98,6 +99,19 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame, onLeaveRo
         socket.on('room_settings_updated', handleSettingsUpdated);
         return () => {
             socket.off('room_settings_updated', handleSettingsUpdated);
+        };
+    }, []);
+
+    useEffect(() => {
+        const onConnect = () => setIsConnected(true);
+        const onDisconnect = () => setIsConnected(false);
+
+        socket.on('connect', onConnect);
+        socket.on('disconnect', onDisconnect);
+
+        return () => {
+            socket.off('connect', onConnect);
+            socket.off('disconnect', onDisconnect);
         };
     }, []);
 
@@ -248,7 +262,7 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame, onLeaveRo
                         boxShadow: '0 2px 10px rgba(0,0,0,0.5)'
                     }}
                 >
-                    v3.1
+                    v3.2
                 </span>
 
                 <button
