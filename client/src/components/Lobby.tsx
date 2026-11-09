@@ -261,15 +261,19 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame, onLeaveRo
                         fontSize: 11,
                         fontWeight: 800,
                         color: '#38bdf8',
-                        background: 'rgba(15, 23, 42, 0.85)',
-                        padding: '4px 8px',
-                        borderRadius: 8,
-                        border: '1px solid rgba(56, 189, 248, 0.35)',
-                        letterSpacing: 0.5,
-                        boxShadow: '0 2px 10px rgba(0,0,0,0.5)'
+                        background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.9), rgba(30, 58, 138, 0.8))',
+                        padding: '5px 10px',
+                        borderRadius: 10,
+                        border: '1px solid rgba(56, 189, 248, 0.5)',
+                        letterSpacing: 0.8,
+                        boxShadow: '0 4px 15px rgba(56, 189, 248, 0.25), inset 0 1px 1px rgba(255, 255, 255, 0.2)',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4
                     }}
                 >
-                    v3.2
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#38bdf8', boxShadow: '0 0 8px #38bdf8', display: 'inline-block' }}></span>
+                    v3.3 ⚡
                 </span>
 
                 <button
