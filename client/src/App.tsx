@@ -89,6 +89,8 @@ export function App() {
         socket.on('returned_to_lobby', onReturnedToLobby);
         socket.on('returned_to_lobby', onReturnedToLobby);
         socket.on('back_to_lobby', onReturnedToLobby);
+        socket.on('room_joined', onRoomJoined);
+        socket.on('room_Joined', onRoomJoined);
 
         // Следим за возвратом вкладки из сна ТОЛЬКО если сокет реально оборвался
         const handleVisibilityChange = () => {
@@ -101,6 +103,7 @@ export function App() {
 
         return () => {
             socket.off('connect', onConnect);
+            socket.off('room_Joined', onRoomJoined);
             socket.off('room_joined', onRoomJoined);
             socket.off('room_updated', onRoomUpdated);
             socket.off('game_started', onGameStarted);

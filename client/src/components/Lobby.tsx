@@ -128,6 +128,13 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame, onLeaveRo
 
     const handleCreateRoom = (e: React.FormEvent) => {
         e.preventDefault();
+
+        // Быстрая диагностика прямо на экране телефона
+        if (!socket.connected) {
+            alert('❌ Нет соединения с сервером Socket.io! (сокет оффлайн)');
+            return;
+        }
+
         if (!name.trim()) {
             setError('Введите имя');
             return;
