@@ -1,0 +1,21 @@
+# Зависимости и блокировки пакетов
+**/node_modules/
+package-lock.json
+
+# Скомпилированный код и временные файлы
+dist/
+**/dist/
+.tmp.driveupload/
+**/.tmp.driveupload/
+
+# Статические ассеты (картинки и бандлы)
+*.svg
+*.png
+*.jpg
+*.ico
+client/public/telegram-web-app.js
+
+# Системные папки
+.git/
+.vscode/
+.continue/
