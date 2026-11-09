@@ -35,6 +35,8 @@ export function App() {
         };
 
         const onRoomJoined = (updatedRoom: any) => {
+
+            alert('Событие room_joined получено! Код: ' + updatedRoom.code);
             setRoom(updatedRoom);
             setLevel(null);
             localStorage.setItem('gc_active_room', updatedRoom.code);
@@ -82,6 +84,22 @@ export function App() {
 
         socket.on('connect', onConnect);
         socket.on('room_joined', onRoomJoined);
+
+
+
+
+
+        socket.on('error_message', (msg: any) => {
+            const text = typeof msg === 'string' ? msg : JSON.stringify(msg);
+            alert('Ошибка от сервера: ' + text);
+        });
+
+
+
+
+
+
+
         socket.on('room_updated', onRoomUpdated);
         socket.on('game_started', onGameStarted);
         socket.on('session_restored', onSessionRestored);
@@ -89,8 +107,8 @@ export function App() {
         socket.on('returned_to_lobby', onReturnedToLobby);
         socket.on('returned_to_lobby', onReturnedToLobby);
         socket.on('back_to_lobby', onReturnedToLobby);
-        socket.on('room_joined', onRoomJoined);
-        socket.on('room_Joined', onRoomJoined);
+
+
 
         // Следим за возвратом вкладки из сна ТОЛЬКО если сокет реально оборвался
         const handleVisibilityChange = () => {
@@ -103,8 +121,9 @@ export function App() {
 
         return () => {
             socket.off('connect', onConnect);
-            socket.off('room_Joined', onRoomJoined);
+
             socket.off('room_joined', onRoomJoined);
+            socket.off('error_message');
             socket.off('room_updated', onRoomUpdated);
             socket.off('game_started', onGameStarted);
             socket.off('left_room', onLeftRoom);

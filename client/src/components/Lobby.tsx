@@ -129,7 +129,8 @@ export const Lobby: React.FC<LobbyProps> = ({ room, myId, onStartGame, onLeaveRo
     const handleCreateRoom = (e: React.FormEvent) => {
         e.preventDefault();
 
-        // Быстрая диагностика прямо на экране телефона
+        alert(`Клик! Сокет онлайн: ${socket.connected} | ID: ${socket.id || 'нет'}`);
+
         if (!socket.connected) {
             alert('❌ Нет соединения с сервером Socket.io! (сокет оффлайн)');
             return;
